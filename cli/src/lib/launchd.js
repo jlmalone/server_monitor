@@ -9,24 +9,21 @@ import { loadConfig, expandPath } from './config.js';
 export function generatePlist(service, settings) {
   const logDir = expandPath(settings.logDir);
   const workingDir = expandPath(service.path);
-  
-  // Ensure log directory exists
-  if (!existsSync(logDir)) {
-    mkdirSync(logDir, { recursive: true });
-  }
-  
+
+
+
   // Parse command - can be string or array
-  const command = Array.isArray(service.command) 
-    ? service.command 
+  const command = Array.isArray(service.command)
+    ? service.command
     : service.command.split(/\s+/);
-  
+
   // Build ProgramArguments XML
-  const programArgs = command.map(arg => 
+  const programArgs = command.map(arg =>
     `        <string>${escapeXml(arg)}</string>`
   ).join('\n');
-  
+
   const shortName = service.identifier.split('.').pop();
-  
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -71,23 +68,28 @@ function escapeXml(str) {
 export function installService(service) {
   const config = loadConfig();
   const { settings } = config;
-  
+
   // Generate plist content
   const plistContent = generatePlist(service, settings);
-  
+
   // Write to plist directory (source)
   const plistDir = expandPath(settings.plistDir);
+  const logDir = expandPath(settings.logDir);
+
   if (!existsSync(plistDir)) {
     mkdirSync(plistDir, { recursive: true });
   }
+  if (!existsSync(logDir)) {
+    mkdirSync(logDir, { recursive: true });
+  }
   const sourcePath = join(plistDir, `${service.identifier}.plist`);
   writeFileSync(sourcePath, plistContent);
-  
+
   // Copy to LaunchAgents
   const launchAgentsDir = expandPath(settings.launchAgentsDir);
   const destPath = join(launchAgentsDir, `${service.identifier}.plist`);
   writeFileSync(destPath, plistContent);
-  
+
   // Load into launchd
   try {
     // First try to unload if exists
@@ -96,7 +98,7 @@ export function installService(service) {
   } catch (err) {
     throw new Error(`Failed to load service: ${err.message}`);
   }
-  
+
   return { sourcePath, destPath };
 }
 
@@ -106,10 +108,10 @@ export function installService(service) {
 export function uninstallService(service) {
   const config = loadConfig();
   const { settings } = config;
-  
+
   const launchAgentsDir = expandPath(settings.launchAgentsDir);
   const destPath = join(launchAgentsDir, `${service.identifier}.plist`);
-  
+
   // Stop and unload
   try {
     execSync(`launchctl stop "${service.identifier}" 2>/dev/null || true`, { stdio: 'ignore' });
@@ -117,12 +119,12 @@ export function uninstallService(service) {
   } catch (err) {
     // Ignore errors during unload
   }
-  
+
   // Remove plist from LaunchAgents
   if (existsSync(destPath)) {
     unlinkSync(destPath);
   }
-  
+
   return true;
 }
 
@@ -132,15 +134,15 @@ export function uninstallService(service) {
 export function getServiceStatus(identifier) {
   try {
     const output = execSync(`launchctl list "${identifier}" 2>&1`, { encoding: 'utf-8' });
-    
+
     // Parse PID
     const pidMatch = output.match(/"PID"\s*=\s*(\d+)/);
     const pid = pidMatch ? parseInt(pidMatch[1], 10) : null;
-    
+
     // Parse exit status
     const exitMatch = output.match(/"LastExitStatus"\s*=\s*(\d+)/);
     const exitStatus = exitMatch ? parseInt(exitMatch[1], 10) : null;
-    
+
     return {
       loaded: true,
       running: pid !== null,
@@ -264,11 +266,11 @@ export function restartService(identifier) {
 export function getAllManagedServices() {
   const config = loadConfig();
   const prefix = config.settings.identifierPrefix;
-  
+
   try {
     const output = execSync('launchctl list', { encoding: 'utf-8' });
     const services = [];
-    
+
     for (const line of output.split('\n')) {
       if (line.includes(prefix)) {
         const parts = line.trim().split(/\s+/);
@@ -283,7 +285,7 @@ export function getAllManagedServices() {
         }
       }
     }
-    
+
     return services;
   } catch (err) {
     return [];

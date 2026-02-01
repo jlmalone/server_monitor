@@ -21,7 +21,8 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 ### Install CLI
 
 ```bash
-cd ~/ios_code/server_monitor/cli
+git clone https://github.com/yourusername/server-monitor.git
+cd server-monitor/cli
 npm install
 npm link
 ```

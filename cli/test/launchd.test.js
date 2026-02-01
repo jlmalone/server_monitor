@@ -111,8 +111,12 @@ describe('launchd library', () => {
   });
 
   describe('getServiceStatus()', () => {
-    it('should parse running service status', () => {
+    it('should parse running service status', (t) => {
       // This is an integration test - requires actual launchd
+      if (process.env.CI === 'true') {
+        t.skip('Skipping on CI');
+        return;
+      }
       // In real env, would mock execSync
       const status = getServiceStatus('com.apple.SystemUIServer');
 
@@ -140,7 +144,7 @@ describe('launchd library', () => {
       } catch (err) {
         // Expected to fail - we're just checking it tries the right commands
         assert.ok(err.message.includes('Failed to stop service') ||
-                  err.message.includes('ENOENT'));
+          err.message.includes('ENOENT'));
       }
     });
   });
@@ -154,7 +158,7 @@ describe('launchd library', () => {
       } catch (err) {
         // Expected to fail - testing code path
         assert.ok(err.message.includes('Failed to start service') ||
-                  err.message.includes('Plist not found'));
+          err.message.includes('Plist not found'));
       }
     });
   });
@@ -168,13 +172,17 @@ describe('launchd library', () => {
       } catch (err) {
         // Expected to fail in test env
         assert.ok(err.message.includes('Failed') ||
-                  err.message.includes('ENOENT'));
+          err.message.includes('ENOENT'));
       }
     });
   });
 
   describe('getAllManagedServices()', () => {
-    it('should return array of services', () => {
+    it('should return array of services', (t) => {
+      if (process.env.CI === 'true') {
+        t.skip('Skipping on CI');
+        return;
+      }
       const services = getAllManagedServices();
 
       assert.ok(Array.isArray(services));

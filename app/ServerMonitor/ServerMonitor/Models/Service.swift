@@ -34,6 +34,11 @@ struct Service: Identifiable, Codable {
     let healthCheckURL: String?
     let critical: Bool
     
+    // Config fields
+    var path: String?
+    var command: [String]?
+    var enabled: Bool?
+    
     var status: ServiceStatus = .unknown
     var pid: Int?
     var lastChecked: Date?
@@ -46,6 +51,7 @@ struct Service: Identifiable, Codable {
         self.port = port
         self.healthCheckURL = healthCheckURL
         self.critical = critical
+        self.enabled = true
     }
     
     enum CodingKeys: String, CodingKey {

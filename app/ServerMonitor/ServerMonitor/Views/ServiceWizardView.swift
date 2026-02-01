@@ -54,11 +54,11 @@ struct ServiceWizardView: View {
     
     private func addService() {
         guard let port = Int(portStr) else { return }
-        
+
         // Generate simple identifier
         let identifier = "com.user." + name.lowercased().replacingOccurrences(of: " ", with: "-")
-        
-        let newService = Service(
+
+        var newService = Service(
             name: name,
             identifier: identifier,
             port: port,
@@ -68,7 +68,7 @@ struct ServiceWizardView: View {
         newService.path = path
         newService.command = command.components(separatedBy: " ")
         newService.enabled = true
-        
+
         monitor.add(service: newService)
         presentationMode.wrappedValue.dismiss()
     }

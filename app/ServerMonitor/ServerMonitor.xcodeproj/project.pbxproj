@@ -11,6 +11,8 @@
 		002 /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102; };
 		003 /* ServiceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103; };
 		004 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104; };
+		005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105; };
+		006 /* ServiceWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +21,8 @@
 		102 /* Service.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Service.swift; sourceTree = "<group>"; };
 		103 /* ServiceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceMonitor.swift; sourceTree = "<group>"; };
 		104 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		105 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		106 /* ServiceWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceWizardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +83,8 @@
 			isa = PBXGroup;
 			children = (
 				104 /* MenuBarView.swift */,
+				105 /* SettingsView.swift */,
+				106 /* ServiceWizardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -144,6 +150,8 @@
 				002 /* Service.swift in Sources */,
 				003 /* ServiceMonitor.swift in Sources */,
 				004 /* MenuBarView.swift in Sources */,
+				005 /* SettingsView.swift in Sources */,
+				006 /* ServiceWizardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -13,16 +13,16 @@ struct ServerMonitorApp: App {
                 Divider()
                 
                 HStack {
-                    // Button(action: {
-                    //     openWindow(id: "settings")
-                    // }) {
-                    //     Label("Manage Services", systemImage: "gearshape")
-                    // }
-                    // .buttonStyle(.plain)
-                    // .padding(.horizontal)
+                    Button(action: {
+                        openWindow(id: "settings")
+                    }) {
+                        Label("Manage Services", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
 
                     Spacer()
-                    
+
                     Button("Quit") {
                         NSApplication.shared.terminate(nil)
                     }
@@ -38,10 +38,10 @@ struct ServerMonitorApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        // WindowGroup("Settings", id: "settings") {
-        //     SettingsView(monitor: monitor)
-        // }
-        // .windowResizability(.contentSize)
-        // .defaultSize(width: 500, height: 400)
+        WindowGroup("Settings", id: "settings") {
+            SettingsView(monitor: monitor)
+        }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 500, height: 400)
     }
 }

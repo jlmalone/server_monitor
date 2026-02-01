@@ -34,70 +34,98 @@ struct ServiceWizardView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 16) {
             // Header
             Text(isEditMode ? "Edit Service" : "Add Service")
                 .font(.headline)
-                .padding()
+                .padding(.top)
             
             Divider()
             
-            Form {
-                Section(header: Text("Service Details")) {
-                    TextField("Name", text: $name)
+            // Form fields with proper labels
+            VStack(alignment: .leading, spacing: 12) {
+                // Name
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Name").font(.caption).foregroundColor(.secondary)
+                    TextField("My App", text: $name)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .disabled(isEditMode) // Can't change name/identifier when editing
-                    
+                        .disabled(isEditMode)
+                }
+                
+                // Working Directory
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Working Directory").font(.caption).foregroundColor(.secondary)
                     HStack {
-                        TextField("Working Directory", text: $path)
+                        TextField("/path/to/project", text: $path)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
                         Button("Browse...") {
                             browseForFolder()
                         }
                     }
-                    
-                    TextField("Command (e.g. npm run dev)", text: $command)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    TextField("Port", text: $portStr)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .onChange(of: portStr) { newValue in
-                            let filtered = newValue.filter { "0123456789".contains($0) }
-                            if filtered != newValue {
-                                portStr = filtered
-                            }
-                        }
-                    
-                    TextField("Health Check URL (auto: http://localhost:PORT)", text: $healthUrl)
+                }
+                
+                // Command
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Command").font(.caption).foregroundColor(.secondary)
+                    TextField("npm run dev", text: $command)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 
-                Section(header: Text("Options")) {
+                // Port and Health Check in HStack
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Port").font(.caption).foregroundColor(.secondary)
+                        TextField("3000", text: $portStr)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 80)
+                            .onChange(of: portStr) { newValue in
+                                let filtered = newValue.filter { "0123456789".contains($0) }
+                                if filtered != newValue {
+                                    portStr = filtered
+                                }
+                            }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Health Check URL").font(.caption).foregroundColor(.secondary)
+                        TextField("auto: http://localhost:PORT", text: $healthUrl)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
+                }
+                
+                Divider()
+                
+                // Options
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Options").font(.caption).foregroundColor(.secondary)
                     Toggle("Enabled", isOn: $enabled)
                     Toggle("Keep Alive (restart on crash)", isOn: $keepAlive)
                 }
-                
-                Section {
-                    HStack {
-                        Button("Cancel") {
-                            presentationMode.wrappedValue.dismiss()
-                        }
-                        .keyboardShortcut(.escape, modifiers: [])
-                        
-                        Spacer()
-                        
-                        Button(action: saveService) {
-                            Text(isEditMode ? "Save Changes" : "Add Service")
-                        }
-                        .keyboardShortcut(.return, modifiers: [])
-                        .disabled(!isFormValid)
-                    }
+            }
+            .padding(.horizontal)
+            
+            Spacer()
+            
+            // Buttons
+            Divider()
+            HStack {
+                Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
                 }
+                .keyboardShortcut(.escape, modifiers: [])
+                
+                Spacer()
+                
+                Button(action: saveService) {
+                    Text(isEditMode ? "Save Changes" : "Add Service")
+                }
+                .keyboardShortcut(.return, modifiers: [])
+                .disabled(!isFormValid)
+                .buttonStyle(.borderedProminent)
             }
             .padding()
         }
-        .frame(width: 450, height: 400)
+        .frame(width: 500, height: 420)
     }
     
     private var isFormValid: Bool {
@@ -128,7 +156,6 @@ struct ServiceWizardView: View {
     
     private func parseCommand(_ cmd: String) -> [String] {
         // Simple space-based splitting for now
-        // Could be enhanced to handle quoted strings
         cmd.components(separatedBy: " ").filter { !$0.isEmpty }
     }
     

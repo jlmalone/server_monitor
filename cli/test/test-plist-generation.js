@@ -60,7 +60,7 @@ if (test('escapeXml handles null/undefined', () => {
 
 // Test extractShortName
 if (test('extractShortName extracts last segment', () => {
-  assertEqual(extractShortName('vision.salient.redo-https'), 'redo-https');
+  assertEqual(extractShortName('com.servermonitor.my-service'), 'my-service');
   assertEqual(extractShortName('com.example.myservice'), 'myservice');
   assertEqual(extractShortName('simple'), 'simple');
 })) passed++; else failed++;

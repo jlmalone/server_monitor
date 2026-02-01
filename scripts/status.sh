@@ -1,10 +1,10 @@
 #!/bin/bash
 # status.sh - Show status of all monitored services
-# Usage: ./status.sh [--json]
+# Usage: ./status.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-CONFIG_FILE="$PROJECT_DIR/config/services.json"
+CONFIG_FILE="$PROJECT_DIR/services.json"
 
 # Colors
 RED='\033[0;31m'
@@ -82,38 +82,11 @@ check_launchd_service() {
     echo ""
 }
 
-check_process() {
-    local pattern=$1
-    local name=$2
-    local port=$3
-    
-    echo -e "${BOLD}$name${NC}"
-    echo -e "  Process:    ${CYAN}$pattern${NC}"
-    
-    local pid=$(pgrep -f "$pattern" 2>/dev/null | head -1)
-    
-    if [ -n "$pid" ]; then
-        echo -e "  Status:     ${GREEN}● RUNNING${NC} (PID: $pid)"
-        
-        if [ -n "$port" ]; then
-            local port_check=$(netstat -an 2>/dev/null | grep -E "LISTEN.*\.$port ")
-            if [ -n "$port_check" ]; then
-                echo -e "  Port:       ${GREEN}● $port listening${NC}"
-            else
-                echo -e "  Port:       ${YELLOW}○ $port not detected${NC}"
-            fi
-        fi
-    else
-        echo -e "  Status:     ${RED}○ NOT RUNNING${NC}"
-    fi
-    echo ""
-}
-
-show_all_salient_services() {
-    echo -e "${BOLD}${BLUE}═══ All salient LaunchD Services ═══${NC}"
+show_all_servermonitor_services() {
+    echo -e "${BOLD}${BLUE}═══ All ServerMonitor LaunchD Services ═══${NC}"
     echo ""
     
-    local services=$(launchctl list 2>/dev/null | grep "salient")
+    local services=$(launchctl list 2>/dev/null | grep -E "servermonitor|com\.servermonitor")
     
     if [ -n "$services" ]; then
         echo "$services" | while read line; do
@@ -128,7 +101,7 @@ show_all_salient_services() {
             fi
         done
     else
-        echo -e "  ${YELLOW}No salient services found${NC}"
+        echo -e "  ${YELLOW}No servermonitor services found${NC}"
     fi
     echo ""
 }
@@ -156,8 +129,8 @@ show_active_ports() {
 show_summary() {
     echo -e "${BOLD}${BLUE}═══ Summary ═══${NC}"
     
-    local total=$(launchctl list 2>/dev/null | grep -c "salient" || echo "0")
-    local running=$(launchctl list 2>/dev/null | grep "salient" | awk '$1 != "-" && $1 != "0"' | wc -l | tr -d ' ')
+    local total=$(launchctl list 2>/dev/null | grep -cE "servermonitor|com\.servermonitor" || echo "0")
+    local running=$(launchctl list 2>/dev/null | grep -E "servermonitor|com\.servermonitor" | awk '$1 != "-" && $1 != "0"' | wc -l | tr -d ' ')
     local stopped=$((total - running))
     
     echo "  Total services: $total"
@@ -168,7 +141,7 @@ show_summary() {
     if [ "$stopped" -eq 0 ] && [ "$total" -gt 0 ]; then
         echo -e "  ${GREEN}✓ All services healthy!${NC}"
     elif [ "$total" -eq 0 ]; then
-        echo -e "  ${YELLOW}⚠ No services installed. Run: ./install.sh${NC}"
+        echo -e "  ${YELLOW}⚠ No services installed. Use 'sm add' to configure services.${NC}"
     else
         echo -e "  ${YELLOW}⚠ Some services need attention${NC}"
     fi
@@ -178,9 +151,10 @@ show_summary() {
 show_quick_commands() {
     echo -e "${BOLD}${BLUE}═══ Quick Commands ═══${NC}"
     echo "  View logs:    tail -f $PROJECT_DIR/logs/*.log"
-    echo "  Install:      $SCRIPT_DIR/install.sh"
-    echo "  Uninstall:    $SCRIPT_DIR/uninstall.sh"
-    echo "  Monitor:      $SCRIPT_DIR/monitor.sh"
+    echo "  List:         sm list"
+    echo "  Status:       sm status"
+    echo "  Start all:    sm start --all"
+    echo "  Stop all:     sm stop --all"
     echo ""
 }
 
@@ -189,20 +163,7 @@ show_quick_commands() {
 # ═══════════════════════════════════════════════════════════════
 
 print_header
-
-echo -e "${BOLD}${BLUE}═══ Monitored Services ═══${NC}"
-echo ""
-
-# Check our known services
-check_launchd_service "vision.salient.redo-https" "Redo HTTPS Server" "3443" "https://localhost:3443"
-check_launchd_service "com.clawdbot.gateway" "Clawdbot Gateway" "3333" "http://localhost:3333/health"
-
-echo -e "${BOLD}${BLUE}═══ Additional Processes ═══${NC}"
-echo ""
-check_process "log-server" "Redo Log Server" "3444"
-check_process "debug-server" "Redo Debug Server" "3445"
-
-show_all_salient_services
+show_all_servermonitor_services
 show_active_ports
 show_summary
 show_quick_commands

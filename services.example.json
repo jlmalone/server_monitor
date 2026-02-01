@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "settings": {
+        "logDir": "./logs",
+        "identifierPrefix": "com.yourname"
+    },
+    "services": [
+        {
+            "name": "My App",
+            "identifier": "com.yourname.my-app",
+            "path": "~/projects/my-app",
+            "command": [
+                "npx",
+                "vite",
+                "--port",
+                "3000",
+                "--host"
+            ],
+            "port": 3000,
+            "healthCheck": "http://localhost:3000",
+            "enabled": true
+        },
+        {
+            "name": "API Server",
+            "identifier": "com.yourname.api",
+            "path": "~/projects/api",
+            "command": [
+                "node",
+                "server.js"
+            ],
+            "port": 4000,
+            "healthCheck": "http://localhost:4000/health",
+            "enabled": true
+        }
+    ]
+}

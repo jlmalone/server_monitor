@@ -6,7 +6,7 @@ Thanks for your interest in contributing! 🎉
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/jlmalone/server_monitor.git
+   git clone https://github.com/YOUR_USERNAME/server-monitor.git
    cd server-monitor
    ```
 
@@ -30,12 +30,12 @@ server_monitor/
 │   │   ├── commands/    # CLI command implementations
 │   │   └── lib/         # Shared utilities
 │   └── bin/sm           # CLI entry point
-├── app/                 # SwiftUI menu bar app
+├── app/                 # SwiftUI menu bar app (macOS only)
 │   └── ServerMonitor/
-├── skill/               # Clawdbot LLM integration
-├── launchd/             # Generated plist files
-├── logs/                # Service logs
-└── services.json        # Central configuration
+├── logs/                # Service logs (generated)
+├── launchd/             # Generated plist files (macOS)
+├── services.json        # Your service configuration (copy from services.example.json)
+└── services.example.json # Example configuration template
 ```
 
 ## Making Changes

@@ -52,20 +52,22 @@ sm add --name "My App" --path ~/myproject --port 5000
 
 ### CLI Output
 ```
-┌────────────┬──────┬───────────┬───────┬───────────────────────────┐
-│ Service    │ Port │ Status    │ PID   │ Identifier                │
-├────────────┼──────┼───────────┼───────┼───────────────────────────┤
-│ Universe   │ 4001 │ ● Running │ 37695 │ vision.salient.universe   │
-│ Vision     │ 4002 │ ● Running │ 37700 │ vision.salient.vision     │
-│ Numina     │ 4003 │ ● Running │ 37685 │ vision.salient.numina     │
-│ Knomee     │ 4004 │ ● Running │ 37680 │ vision.salient.knomee     │
-└────────────┴──────┴───────────┴───────┴───────────────────────────┘
+┌────────────┬──────┬───────────┬───────┬─────────────────────────────┐
+│ Service    │ Port │ Status    │ PID   │ Identifier                  │
+├────────────┼──────┼───────────┼───────┼─────────────────────────────┤
+│ Frontend   │ 3000 │ ● Running │ 12345 │ com.servermonitor.frontend  │
+│ API Server │ 4000 │ ● Running │ 12346 │ com.servermonitor.api       │
+│ Worker     │ 5000 │ ○ Stopped │ -     │ com.servermonitor.worker    │
+└────────────┴──────┴───────────┴───────┴─────────────────────────────┘
 
-✓ All 4 services running
+✓ 2/3 services running
 ```
 
 ### Menu Bar App
-The SwiftUI menu bar app shows service status at a glance with hover controls for quick start/stop/restart.
+
+![Server Monitor Menu Bar](assets/menubar-screenshot.png)
+
+The SwiftUI menu bar app shows service status at a glance with controls to start, stop, restart, and view logs.
 
 ## 📋 Commands
 
@@ -97,15 +99,12 @@ server_monitor/
 ├── cli/                 # Node.js CLI tool (sm command)
 │   ├── src/commands/    # Command implementations
 │   └── src/lib/         # Config, launchd, health utilities
-├── app/                 # SwiftUI menu bar app
+├── app/                 # SwiftUI menu bar app (macOS)
 │   └── ServerMonitor/
-├── skill/               # Clawdbot LLM integration
-│   ├── SKILL.md         # LLM instructions
-│   └── examples.md      # Usage examples
-├── launchd/             # Generated plist files
 ├── logs/                # Service stdout/stderr logs
-├── services.json        # Central service registry
-└── scripts/             # Legacy shell scripts
+├── services.json        # Service configuration (user-specific, gitignored)
+├── services.example.json # Example configuration template
+└── scripts/             # Helper shell scripts
 ```
 
 ## ⚙️ Configuration
@@ -116,61 +115,49 @@ Services are defined in `services.json`:
 {
   "version": "2.0.0",
   "settings": {
-    "logDir": "/path/to/logs",
-    "identifierPrefix": "vision.salient"
+    "logDir": "./logs",
+    "identifierPrefix": "com.servermonitor"
   },
   "services": [
     {
       "name": "My App",
-      "identifier": "vision.salient.my-app",
-      "path": "/path/to/project",
-      "command": ["npx", "vite", "--port", "4001"],
-      "port": 4001,
-      "healthCheck": "http://localhost:4001",
+      "identifier": "com.servermonitor.my-app",
+      "path": "~/projects/my-app",
+      "command": ["npm", "run", "dev"],
+      "port": 3000,
+      "healthCheck": "http://localhost:3000",
       "enabled": true
     }
   ]
 }
 ```
 
-## 🍎 Why launchd?
+## 💡 How It Works
 
-Unlike background processes started from terminals:
+The CLI uses platform-native process management:
 
+- **macOS**: Uses `launchd` (LaunchAgents) for reliable background services
+- **Linux**: *(planned)* systemd units
+- **Windows**: *(planned)* Windows Services
+
+Benefits:
 - ✅ **Survives terminal close** - Services keep running
-- ✅ **Survives logout** - Optional: can run as system daemon
-- ✅ **Auto-restart** - Crashed services restart automatically
+- ✅ **Auto-restart** - Crashed services restart automatically  
 - ✅ **Boot persistence** - Services start at login
-- ✅ **Native macOS** - No third-party process managers
+- ✅ **Native integration** - No third-party process managers
 
-## 🤖 LLM Integration
-
-The `skill/` directory enables natural language server management:
-
-- "What servers are running?"
-- "Stop the universe server"
-- "Show me the logs for numina"
-- "Add a dev server for ~/myproject on port 4005"
-
-See [skill/SKILL.md](./skill/SKILL.md) for integration details.
-
-## 🔧 Manual launchd Commands
+## 🔧 Manual Commands (macOS)
 
 ```bash
 # List managed services
-launchctl list | grep salient
+launchctl list | grep servermonitor
 
-# Stop a service
-launchctl stop vision.salient.universe
-
-# Start a service
-launchctl start vision.salient.universe
-
-# Unload completely
-launchctl unload ~/Library/LaunchAgents/vision.salient.universe.plist
+# Stop/start a service
+launchctl stop com.servermonitor.my-app
+launchctl start com.servermonitor.my-app
 
 # View logs
-tail -f ~/ios_code/server_monitor/logs/universe.log
+tail -f ./logs/my-app.log
 ```
 
 ## 🐛 Troubleshooting
@@ -180,11 +167,8 @@ tail -f ~/ios_code/server_monitor/logs/universe.log
 # Check error log
 sm logs <name> --error
 
-# Validate plist
-plutil ~/Library/LaunchAgents/vision.salient.<name>.plist
-
-# Check port in use
-/usr/sbin/lsof -i :<port>
+# Check if port is in use
+lsof -i :<port>
 ```
 
 ### Service keeps restarting
@@ -195,12 +179,12 @@ sm logs <name> --error
 
 ### CLI command not found
 ```bash
-cd ~/ios_code/server_monitor/cli && npm link
+cd cli && npm link
 ```
 
 ## 📄 License
 
-MIT © jlmalone
+MIT © Salient Vision Technologies, LLC
 
 ## 🙏 Contributing
 

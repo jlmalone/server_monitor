@@ -9,7 +9,7 @@
         <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/npx</string>
         <string>vite</string>
         <string>--port</string>
-        <string>3001</string>
+        <string>4001</string>
         <string>--host</string>
     </array>
     <key>WorkingDirectory</key>

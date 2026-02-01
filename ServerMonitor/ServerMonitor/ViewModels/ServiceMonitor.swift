@@ -6,10 +6,10 @@ import UserNotifications
 class ServiceMonitor: ObservableObject {
     @Published var services: [Service] = [
         Service(name: "Redo HTTPS", identifier: "vision.salient.redo-https", port: 3000, healthCheckURL: "https://localhost:3000"),
-        Service(name: "Universe", identifier: "vision.salient.universe", port: 3001, healthCheckURL: "http://localhost:3001"),
-        Service(name: "Vision", identifier: "vision.salient.vision", port: 3002, healthCheckURL: "http://localhost:3002"),
-        Service(name: "Numina", identifier: "vision.salient.numina", port: 3003, healthCheckURL: "http://localhost:3003"),
-        Service(name: "Knomee", identifier: "vision.salient.knomee", port: 3004, healthCheckURL: "http://localhost:3004")
+        Service(name: "Universe", identifier: "vision.salient.universe", port: 4001, healthCheckURL: "http://localhost:4001"),
+        Service(name: "Vision", identifier: "vision.salient.vision", port: 4002, healthCheckURL: "http://localhost:4002"),
+        Service(name: "Numina", identifier: "vision.salient.numina", port: 4003, healthCheckURL: "http://localhost:4003"),
+        Service(name: "Knomee", identifier: "vision.salient.knomee", port: 4004, healthCheckURL: "http://localhost:4004")
     ]
     
     @Published var lastUpdate: Date?

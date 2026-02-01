@@ -1,27 +1,27 @@
 {
   "service": {
-    "identifier": "vision.salient.redo-https",
-    "name": "Redo HTTPS",
+    "identifier": "com.servermonitor.test-https",
+    "name": "Test HTTPS Server",
     "command": [
-      "/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/node",
-      "/Users/josephmalone/WebstormProjects/redo-web-app/https-server.js"
+      "/usr/local/bin/node",
+      "/path/to/project/https-server.js"
     ],
-    "path": "/Users/josephmalone/WebstormProjects/redo-web-app",
+    "path": "/path/to/project",
     "enabled": true,
     "keepAlive": {
       "SuccessfulExit": false
     },
     "throttleInterval": 10,
     "environmentVariables": {
-      "PATH": "/Users/josephmalone/.nvm/versions/node/v24.13.0/bin:/usr/local/bin:/usr/bin:/bin",
+      "PATH": "/usr/local/bin:/usr/bin:/bin",
       "NODE_ENV": "development"
     },
     "port": 3000,
     "healthCheck": "https://localhost:3000"
   },
   "settings": {
-    "logDir": "/Users/josephmalone/ios_code/server_monitor/logs",
-    "identifierPrefix": "vision.salient"
+    "logDir": "/tmp/servermonitor/logs",
+    "identifierPrefix": "com.servermonitor"
   },
   "_comment": "Golden fixture for cross-platform plist generation validation. Swift and Node.js implementations should produce identical XML output for this input."
 }

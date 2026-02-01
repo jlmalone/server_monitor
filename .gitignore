@@ -11,6 +11,13 @@ services.json
 launchd/
 config/services.json
 
+# Build outputs
+build/
+dist/
+*.app
+*.dmg
+DerivedData/
+
 # macOS
 .DS_Store
 *.swp
@@ -23,11 +30,6 @@ app/ServerMonitor/DerivedData/
 app/ServerMonitor/build/
 *.xcuserstate
 
-# Build outputs
-build/
-dist/
-*.app
-
 # IDE
 .idea/
 .vscode/
@@ -37,4 +39,12 @@ config/*.bak
 
 # npm
 # package-lock.json
-~
+
+# Credentials and secrets
+scripts/.env
+.env
+*.p12
+*.p8
+
+# Backup/archive folders
+launchd_bak_todo/

@@ -1,2 +1,2 @@
-#!/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/node
+#!/usr/bin/env node
 import '../src/index.js';

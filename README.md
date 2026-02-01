@@ -1,6 +1,6 @@
 # Server Monitor 🖥️
 
-[![macOS](https://img.shields.io/badge/macOS-14+-blue?logo=apple)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-13+-blue?logo=apple)](https://www.apple.com/macos/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
@@ -10,25 +10,54 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 ## ✨ Features
 
 - **🔧 CLI Tool (`sm`)** - Manage services from the terminal
-- **📱 Menu Bar App** - Quick status view and controls
-- **🤖 LLM Integration** - Natural language server management
+- **📱 Menu Bar App** - Quick status view and controls from your menu bar
 - **🔄 Auto-restart** - launchd automatically restarts crashed services
-- **📊 Health Checks** - HTTP health monitoring
-- **📝 Centralized Logs** - All logs in one place
+- **📊 Health Checks** - HTTP health monitoring for each service
+- **📝 Centralized Logs** - All service logs in one configurable location
+- **🚀 JSON-first Config** - Single source of truth in `services.json`
+- **🔒 Boot Persistence** - Services start automatically at login
 
-## 🚀 Quick Start
+## 🚀 Installation
 
-### Install CLI
+### Option 1: Download DMG (Recommended)
+
+1. Download the latest `ServerMonitor-x.x.x.dmg` from [GitHub Releases](https://github.com/yourusername/server-monitor/releases)
+2. Open the DMG and drag **Server Monitor** to Applications
+3. Launch Server Monitor from Applications
+
+### Option 2: Build from Source
 
 ```bash
 git clone https://github.com/yourusername/server-monitor.git
-cd server-monitor/cli
+cd server-monitor
+
+# Build the app
+cd app/ServerMonitor
+xcodebuild -scheme ServerMonitor -configuration Release build
+
+# Install CLI
+cd ../../cli
 npm install
 npm link
 ```
 
-### Basic Usage
+## 🖥️ CLI Setup
 
+Add the CLI to your PATH for easy access:
+
+```bash
+# After npm link in cli/, or add manually:
+export PATH="$PATH:/path/to/server-monitor/cli/bin"
+```
+
+## ⚡ Quick Start
+
+### GUI
+1. Launch **Server Monitor** from Applications
+2. Click the menu bar icon (server tray icon)
+3. Add services via the "+" button or edit `services.json`
+
+### CLI
 ```bash
 # List all services
 sm list
@@ -37,40 +66,57 @@ sm list
 sm status
 
 # Start/stop/restart
-sm start universe
-sm stop numina
+sm start my-app
+sm stop my-app
 sm restart --all
 
 # View logs
-sm logs universe
-sm logs knomee --error
+sm logs my-app
+sm logs my-app --error
 
 # Add a new service
-sm add --name "My App" --path ~/myproject --port 5000
+sm add --name "My App" --path ~/projects/myapp --port 3000 --cmd "npm run dev"
 ```
 
-## 📸 Screenshots
+## 📋 Configuration
 
-### CLI Output
+Services are defined in `services.json` (auto-generated on first run):
+
+```json
+{
+    "version": "2.0.0",
+    "settings": {
+        "logDir": "./logs",
+        "identifierPrefix": "com.servermonitor"
+    },
+    "services": [
+        {
+            "name": "My App",
+            "identifier": "com.servermonitor.my-app",
+            "path": "/path/to/your/project",
+            "command": ["npm", "run", "dev"],
+            "port": 3000,
+            "healthCheck": "http://localhost:3000",
+            "enabled": true
+        }
+    ]
+}
 ```
-┌────────────┬──────┬───────────┬───────┬─────────────────────────────┐
-│ Service    │ Port │ Status    │ PID   │ Identifier                  │
-├────────────┼──────┼───────────┼───────┼─────────────────────────────┤
-│ Frontend   │ 3000 │ ● Running │ 12345 │ com.servermonitor.frontend  │
-│ API Server │ 4000 │ ● Running │ 12346 │ com.servermonitor.api       │
-│ Worker     │ 5000 │ ○ Stopped │ -     │ com.servermonitor.worker    │
-└────────────┴──────┴───────────┴───────┴─────────────────────────────┘
 
-✓ 2/3 services running
-```
+### Service Options
 
-### Menu Bar App
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name for the service |
+| `identifier` | string | Unique launchd identifier (e.g., `com.servermonitor.my-app`) |
+| `path` | string | Working directory for the service |
+| `command` | array | Command and arguments to run |
+| `port` | number | Port the service listens on |
+| `healthCheck` | string | URL for health check endpoint |
+| `enabled` | boolean | Whether service is managed by launchd |
+| `env` | object | (Optional) Environment variables |
 
-![Server Monitor Menu Bar](assets/menubar-screenshot.png)
-
-The SwiftUI menu bar app shows service status at a glance with controls to start, stop, restart, and view logs.
-
-## 📋 Commands
+## 📋 CLI Commands
 
 | Command | Description |
 |---------|-------------|
@@ -79,86 +125,47 @@ The SwiftUI menu bar app shows service status at a glance with controls to start
 | `sm start <name\|--all>` | Start service(s) |
 | `sm stop <name\|--all>` | Stop service(s) |
 | `sm restart <name\|--all>` | Restart service(s) |
-| `sm logs <name>` | Tail service logs |
+| `sm logs <name>` | Tail service stdout logs |
+| `sm logs <name> --error` | Tail service stderr logs |
 | `sm add [options]` | Add new service |
 | `sm remove <name>` | Remove a service |
-
-### Add Options
-```bash
-sm add \
-  --name "My Server" \
-  --path ~/project \
-  --port 4005 \
-  --cmd "npm run dev" \
-  --health "http://localhost:4005/health"
-```
+| `sm edit` | Open services.json in editor |
 
 ## 🏗️ Architecture
 
 ```
 server_monitor/
-├── cli/                 # Node.js CLI tool (sm command)
-│   ├── src/commands/    # Command implementations
-│   └── src/lib/         # Config, launchd, health utilities
-├── app/                 # SwiftUI menu bar app (macOS)
+├── app/                 # SwiftUI Menu Bar App
 │   └── ServerMonitor/
-├── logs/                # Service stdout/stderr logs
-├── services.json        # Service configuration (user-specific, gitignored)
-├── services.example.json # Example configuration template
-└── scripts/             # Helper shell scripts
+├── cli/                 # Node.js CLI tool
+│   ├── src/commands/    # Command implementations
+│   └── src/lib/         # Core utilities
+├── logs/                # Service stdout/stderr (gitignored)
+├── launchd/             # Auto-generated plists (gitignored)
+├── services.json        # Your service configuration (gitignored)
+├── services.example.json # Example configuration
+└── scripts/             # Build and release scripts
 ```
 
-## ⚙️ Configuration
+### How It Works
 
-Services are defined in `services.json`:
+1. **services.json** is the single source of truth
+2. CLI/App reads config and generates launchd plists automatically
+3. `launchctl` manages the actual processes
+4. Services survive terminal close, system sleep, and auto-restart on crash
 
-```json
-{
-  "version": "2.0.0",
-  "settings": {
-    "logDir": "./logs",
-    "identifierPrefix": "com.servermonitor"
-  },
-  "services": [
-    {
-      "name": "My App",
-      "identifier": "com.servermonitor.my-app",
-      "path": "~/projects/my-app",
-      "command": ["npm", "run", "dev"],
-      "port": 3000,
-      "healthCheck": "http://localhost:3000",
-      "enabled": true
-    }
-  ]
-}
-```
-
-## 💡 How It Works
-
-The CLI uses platform-native process management:
-
-- **macOS**: Uses `launchd` (LaunchAgents) for reliable background services
-- **Linux**: *(planned)* systemd units
-- **Windows**: *(planned)* Windows Services
-
-Benefits:
-- ✅ **Survives terminal close** - Services keep running
-- ✅ **Auto-restart** - Crashed services restart automatically  
-- ✅ **Boot persistence** - Services start at login
-- ✅ **Native integration** - No third-party process managers
-
-## 🔧 Manual Commands (macOS)
+## 🔧 Manual launchd Commands
 
 ```bash
 # List managed services
 launchctl list | grep servermonitor
 
-# Stop/start a service
+# Stop/start a service manually
 launchctl stop com.servermonitor.my-app
 launchctl start com.servermonitor.my-app
 
-# View logs
-tail -f ./logs/my-app.log
+# Unload completely (stops KeepAlive)
+launchctl unload ~/Library/LaunchAgents/com.servermonitor.my-app.plist
 ```
 
 ## 🐛 Troubleshooting
@@ -173,20 +180,37 @@ lsof -i :<port>
 ```
 
 ### Service keeps restarting
-Check the error log - the process is likely crashing:
 ```bash
+# Check exit code (0 = ok, non-zero = crash)
+launchctl list | grep <identifier>
+
+# View error log
 sm logs <name> --error
 ```
 
 ### CLI command not found
 ```bash
 cd cli && npm link
+# Or add to PATH: export PATH="$PATH:$(pwd)/cli/bin"
+```
+
+### Health check failing
+```bash
+# Test endpoint manually
+curl -s http://localhost:<port>/health
+
+# Check if service is actually running
+sm status <name>
 ```
 
 ## 📄 License
 
-MIT © Salient Vision Technologies, LLC
+MIT © Joseph Malone
 
 ## 🙏 Contributing
 
-PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md).
+PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+---
+
+**Built with ❤️ for developers who need reliable local services.**

@@ -3,14 +3,14 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>vision.salient.redo-https</string>
+    <string>com.servermonitor.test-https</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/node</string>
-        <string>/Users/josephmalone/WebstormProjects/redo-web-app/https-server.js</string>
+        <string>/usr/local/bin/node</string>
+        <string>/path/to/project/https-server.js</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/josephmalone/WebstormProjects/redo-web-app</string>
+    <string>/path/to/project</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -21,13 +21,13 @@
     <key>ThrottleInterval</key>
     <integer>10</integer>
     <key>StandardOutPath</key>
-    <string>/Users/josephmalone/ios_code/server_monitor/logs/redo-https.log</string>
+    <string>/tmp/servermonitor/logs/test-https.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/josephmalone/ios_code/server_monitor/logs/redo-https.error.log</string>
+    <string>/tmp/servermonitor/logs/test-https.error.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
         <key>NODE_ENV</key>
         <string>development</string>
     </dict>

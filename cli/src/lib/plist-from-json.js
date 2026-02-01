@@ -73,7 +73,7 @@ function valueToXml(value, indent = 2) {
 
 /**
  * Extract short name from identifier
- * e.g., "vision.salient.redo-https" -> "redo-https"
+ * e.g., "com.servermonitor.my-app" -> "my-app"
  * @param {string} identifier - Full service identifier
  * @returns {string} - Short name for log files
  */
@@ -85,7 +85,7 @@ export function extractShortName(identifier) {
  * Generate launchd plist XML from service configuration
  * 
  * @param {Object} service - Service config from services.json
- * @param {string} service.identifier - Unique launchd label (e.g., "vision.salient.myapp")
+ * @param {string} service.identifier - Unique launchd label (e.g., "com.servermonitor.myapp")
  * @param {string|string[]} service.command - Command to run (string or array)
  * @param {string} service.path - Working directory
  * @param {boolean} [service.enabled=true] - Whether to run at load

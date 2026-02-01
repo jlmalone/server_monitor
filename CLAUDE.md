@@ -1,31 +1,35 @@
-# Server Monitor - AI Skill Instructions
+# Server Monitor - AI Development Guide
 
-**Description**: Managing the Server Monitor ecosystem (macOS App, CLI, and launchd services).
+**Description**: Development guide for the Server Monitor macOS ecosystem.
 
-## Project Overview
-A comprehensive macOS solution for managing development servers (Next.js, Node.js, etc.) as persistent background services. It includes a native Menu Bar App, a CLI tool, and an Installer.
+## Architecture Overview
 
-## Architecture
-- **Core**: Uses native `launchd` (LaunchAgents) for service management. Survives reboots/crashes.
-- **CLI**: Node.js tool (`sm`) compiled to a binary. Manages config (`services.json`) and interacts with `launchctl`.
-- **App**: SwiftUI Menu Bar App. visualizes status, toggles services, and edit configuration.
-- **Config**: JSON-based configuration at `~/Library/Application Support/ServerMonitor/services.json` (primary) or local project paths.
+Server Monitor manages development servers as persistent background services using macOS's native `launchd` system.
 
-## Key Capabilities
+### Core Principle: JSON-First Architecture
 
-### 1. Service Management
-Services are defined by a unique `identifier` (e.g., `com.servermonitor.myapp`).
-- **Start**: Load plist -> `launchctl load` -> `launchctl start`
-- **Stop**: `launchctl unload` (stops KeepAlive) or `launchctl stop` + `kill PID`
-- **Monitor**: Check `launchctl list` for PID and Exit Status.
+**`services.json` is the single source of truth.** All launchd plists are auto-generated from this file.
 
-### 2. Configuration (`services.json`)
+```
+services.json → CLI/App reads → Generates plist → launchctl loads
+```
+
+Never edit plists directly - they're regenerated on any service change.
+
+## Key Components
+
+### 1. Configuration (`services.json`)
 ```json
 {
+  "version": "2.0.0",
+  "settings": {
+    "logDir": "./logs",
+    "identifierPrefix": "com.servermonitor"
+  },
   "services": [
     {
       "name": "My App",
-      "identifier": "com.user.my-app",
+      "identifier": "com.servermonitor.my-app",
       "path": "/absolute/path/to/project",
       "command": ["npm", "run", "dev"],
       "port": 3000,
@@ -36,35 +40,140 @@ Services are defined by a unique `identifier` (e.g., `com.servermonitor.myapp`).
 }
 ```
 
-### 3. Packaging & Distribution
-- **Scripts**: Located in `scripts/`.
-- **Build**: `./scripts/build_installer.sh` creates `ServerMonitor.pkg` (App + CLI).
-- **Uninstall**: `./scripts/uninstall.sh` removes App and CLI.
+### 2. CLI (`cli/`)
+- Node.js ES Modules
+- Entry: `cli/src/index.js`
+- Commands in `cli/src/commands/`
+- Core libs in `cli/src/lib/`:
+  - `config.js` - Read/write services.json
+  - `launchd.js` - Generate plists, interact with launchctl
+  - `health.js` - HTTP health checks
+
+### 3. Menu Bar App (`app/ServerMonitor/`)
+- SwiftUI macOS app
+- MVVM architecture
+- `ServiceMonitor.swift` - Main ViewModel (reads services.json, manages state)
+- `MenuBarView.swift` - UI components
+- `Service.swift` - Data model
+
+### 4. File Locations
+
+| Item | Location |
+|------|----------|
+| Config | `./services.json` (gitignored, user-specific) |
+| Example config | `./services.example.json` |
+| Generated plists | `./launchd/` (gitignored) |
+| Logs | `./logs/` (gitignored) |
+| CLI source | `./cli/src/` |
+| App source | `./app/ServerMonitor/ServerMonitor/` |
+
+## Service Lifecycle
+
+### Starting a Service
+1. Read service from `services.json`
+2. Generate plist from template with service config
+3. Write plist to `launchd/{identifier}.plist`
+4. `launchctl load <plist>`
+5. `launchctl start <identifier>`
+
+### Stopping a Service
+1. `launchctl stop <identifier>` (graceful)
+2. `launchctl unload <plist>` (removes KeepAlive)
+3. Optionally kill PID if still running
+
+### Status Check
+1. `launchctl list | grep <identifier>`
+2. Parse: PID (or `-`), ExitStatus, Label
+3. HTTP health check if `healthCheck` URL defined
+
+## Development Guide
+
+### Adding a CLI Command
+1. Create `cli/src/commands/mycommand.js`:
+```javascript
+export const command = 'mycommand <arg>';
+export const describe = 'Description here';
+export const builder = { /* yargs options */ };
+export async function handler(argv) { /* implementation */ }
+```
+2. Import and register in `cli/src/index.js`
+3. Test: `node cli/src/index.js mycommand`
+
+### Adding App Functionality
+1. Add method to `ServiceMonitor` class (ViewModel)
+2. Add UI in `MenuBarView.swift`
+3. Keep Views simple - logic goes in ViewModel
+
+### Plist Template
+Generated plists include:
+- `Label`: The service identifier
+- `ProgramArguments`: The command array
+- `WorkingDirectory`: Service path
+- `StandardOutPath`/`StandardErrorPath`: Log files
+- `KeepAlive`: Auto-restart on crash
+- `RunAtLoad`: Start on login
 
 ## Common Tasks
 
-### Adding a New Command/Feature
-1. **CLI**: Add to `cli/src/commands/`. Register in `cli/src/index.js`.
-2. **App**: Add to `ServiceMonitor.swift` (ViewModel) and UI in `ServerMonitorApp.swift`.
-3. **Parity**: Ensure both CLI and App can perform the action.
+### Debug a Service
+```bash
+# Check launchd status (PID, exit code)
+launchctl list | grep <identifier>
 
-### Debugging Services
-- **Logs**: Check `~/ios_code/server_monitor/logs/` (or configured logDir).
-- **Status**: Run `sm status` or check the Menu Bar App.
-- **Launchd**: `launchctl list | grep <identifier>`
+# View logs
+sm logs <name>
+sm logs <name> --error
 
-## Development Guidelines
-- **Swift**: Use MVVM. Keep Views simple. Logic goes in `ServiceMonitor` or `LaunchAtLogin`.
-- **Node.js**: Use ES Modules. Use `execSync` for system calls. Keep logic platform-agnostic where possible (though this is a macOS tool).
-- **Testing**: `npm test` in `cli/`. Use `test:ci` for CI environments.
+# Check if port is blocked
+lsof -i :<port>
+```
 
-## Skill Routines
-If asked to "add a feature", verify:
-1. Does it need `launchd` changes? (e.g. Env vars, StandardOutPath)
-2. Does the CLI support it?
-3. Does the GUI support it?
-4. Is it persistent?
+### Test Config Changes
+```bash
+# Validate JSON
+cat services.json | jq .
 
-If asked to "debug":
-1. Check `sm logs <service> --error`
-2. Check `launchctl list` status code (0 = ok, 78 = config error, etc)
+# Dry-run plist generation
+sm status --verbose
+```
+
+### Build Release
+```bash
+# Full release build (app + CLI + DMG)
+./scripts/build_release.sh
+
+# Just the app
+cd app/ServerMonitor && xcodebuild -scheme ServerMonitor -configuration Release
+
+# Just sign and notarize
+./scripts/sign_and_notarize.sh
+```
+
+## Testing
+
+```bash
+# CLI tests
+cd cli && npm test
+
+# Manual integration test
+sm add --name "Test" --path /tmp --port 9999 --cmd "python3 -m http.server 9999"
+sm start Test
+curl localhost:9999
+sm stop Test
+sm remove Test
+```
+
+## Exit Codes (launchd)
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 78 | Configuration error |
+| Other | Process crashed with that exit code |
+
+## Important Notes
+
+- **Branch**: Use `master` (not main)
+- **Config is user-specific**: `services.json` is gitignored
+- **Plists are ephemeral**: Regenerated from JSON on changes
+- **Paths**: Use absolute paths in services.json for reliability

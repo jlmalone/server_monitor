@@ -4,27 +4,62 @@ import UserNotifications
 
 @MainActor
 class ServiceMonitor: ObservableObject {
-    @Published var services: [Service] = [
-        // Main dev servers
-        Service(name: "Redo HTTPS", identifier: "vision.salient.redo-https", port: 3000, healthCheckURL: "https://localhost:3000"),
-        Service(name: "Universe", identifier: "vision.salient.universe", port: 4001, healthCheckURL: "http://localhost:4001"),
-        Service(name: "Vision", identifier: "vision.salient.vision", port: 4002, healthCheckURL: "http://localhost:4002"),
-        Service(name: "Numina", identifier: "vision.salient.numina", port: 4003, healthCheckURL: "http://localhost:4003"),
-        Service(name: "Knomee", identifier: "vision.salient.knomee", port: 4004, healthCheckURL: "http://localhost:4004"),
-        
-        // Redo LLM Debug Tools
-        Service(name: "Redo Diagnostics", identifier: "vision.salient.redo-diagnostics", port: 3001, healthCheckURL: "http://localhost:3001"),
-        Service(name: "Redo Log Server", identifier: "vision.salient.redo-logserver", port: 3002, healthCheckURL: "http://localhost:3002"),
-        Service(name: "Redo Debug API", identifier: "vision.salient.redo-debug", port: 3009, healthCheckURL: "http://localhost:3009")
-    ]
+    @Published var services: [Service] = []
     
     @Published var lastUpdate: Date?
     private var timer: Timer?
     private var lastStatuses: [String: ServiceStatus] = [:]
     
     init() {
+        loadServicesFromConfig()
         requestNotificationPermission()
         startMonitoring()
+    }
+
+    func loadServicesFromConfig() {
+        // Try multiple locations for services.json
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let currentDir = FileManager.default.currentDirectoryPath
+
+        let paths = [
+            // 1. Current directory (if running from project)
+            URL(fileURLWithPath: currentDir).appendingPathComponent("services.json"),
+            URL(fileURLWithPath: currentDir).appendingPathComponent("../services.json"),
+            URL(fileURLWithPath: currentDir).appendingPathComponent("../../services.json"),
+
+            // 2. Application Support directory
+            homeDir.appendingPathComponent("Library/Application Support/ServerMonitor/services.json"),
+
+            // 3. Example file as fallback
+            URL(fileURLWithPath: currentDir).appendingPathComponent("services.example.json"),
+            URL(fileURLWithPath: currentDir).appendingPathComponent("../services.example.json"),
+            URL(fileURLWithPath: currentDir).appendingPathComponent("../../services.example.json")
+        ]
+
+        for path in paths {
+            if let data = try? Data(contentsOf: path),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let servicesArray = json["services"] as? [[String: Any]] {
+
+                services = servicesArray.compactMap { dict in
+                    guard let name = dict["name"] as? String,
+                          let identifier = dict["identifier"] as? String,
+                          let port = dict["port"] as? Int,
+                          let healthCheck = dict["healthCheck"] as? String,
+                          let enabled = dict["enabled"] as? Bool,
+                          enabled else { return nil }
+
+                    return Service(name: name, identifier: identifier, port: port, healthCheckURL: healthCheck)
+                }
+
+                if !services.isEmpty {
+                    return
+                }
+            }
+        }
+
+        // If no config found, use empty list
+        print("⚠️ No services.json found. Please copy services.example.json to services.json")
     }
     
     func requestNotificationPermission() {
@@ -186,5 +221,62 @@ class ServiceMonitor: ObservableObject {
     func reloadConfig() {
         // For now, just refresh statuses
         checkAllServices()
+    }
+    
+    func add(service: Service) {
+        services.append(service)
+        saveServices()
+        // Try to start it
+        startService(service)
+    }
+    
+    func remove(service: Service) {
+        stopService(service)
+        services.removeAll { $0.id == service.id }
+        saveServices()
+    }
+    
+    private func saveServices() {
+        // Standardize on Application Support for GUI edits
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let appSupport = homeDir.appendingPathComponent("Library/Application Support/ServerMonitor")
+        let configPath = appSupport.appendingPathComponent("services.json")
+        
+        do {
+            if !FileManager.default.fileExists(atPath: appSupport.path) {
+                try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+            }
+            
+            let servicesData = services.map { service -> [String: Any] in
+                var dict: [String: Any] = [
+                    "name": service.name,
+                    "identifier": service.identifier,
+                    "enabled": service.enabled ?? true
+                ]
+                if let port = service.port { dict["port"] = port }
+                if let health = service.healthCheckURL { dict["healthCheck"] = health }
+                if let path = service.path { dict["path"] = path }
+                if let cmd = service.command { dict["command"] = cmd }
+                return dict
+            }
+            
+            let settings: [String: Any] = [
+                "logDir": "./logs", // Default
+                "identifierPrefix": "com.servermonitor"
+            ]
+            
+            let json: [String: Any] = [
+                "version": "2.0.0",
+                "settings": settings,
+                "services": servicesData
+            ]
+            
+            let data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+            try data.write(to: configPath)
+            
+            print("✅ Saved config to \(configPath.path)")
+        } catch {
+            print("❌ Failed to save config: \(error)")
+        }
     }
 }

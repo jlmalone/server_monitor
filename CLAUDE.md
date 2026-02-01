@@ -1,113 +1,70 @@
-# Server Monitor - AI Instructions
+# Server Monitor - AI Skill Instructions
 
-## Project Goal
-A macOS native solution to:
-1. Run dev servers as persistent launchd services (survive reboots, crashes)
-2. Monitor server health with visual status
-3. Alert when services die
-4. Easy start/stop/restart controls
+**Description**: Managing the Server Monitor ecosystem (macOS App, CLI, and launchd services).
+
+## Project Overview
+A comprehensive macOS solution for managing development servers (Next.js, Node.js, etc.) as persistent background services. It includes a native Menu Bar App, a CLI tool, and an Installer.
 
 ## Architecture
+- **Core**: Uses native `launchd` (LaunchAgents) for service management. Survives reboots/crashes.
+- **CLI**: Node.js tool (`sm`) compiled to a binary. Manages config (`services.json`) and interacts with `launchctl`.
+- **App**: SwiftUI Menu Bar App. visualizes status, toggles services, and edit configuration.
+- **Config**: JSON-based configuration at `~/Library/Application Support/ServerMonitor/services.json` (primary) or local project paths.
 
-### Phase 1: launchd Services (Current)
-- Each server gets a `.plist` file in `~/Library/LaunchAgents/`
-- launchd auto-restarts on crash
-- Logs go to `~/ios_code/server_monitor/logs/`
+## Key Capabilities
 
-### Phase 2: Menu Bar App (Future)
-- SwiftUI menu bar app showing server status
-- Green/red indicators
-- Click to start/stop/view logs
-- System notifications on failures
+### 1. Service Management
+Services are defined by a unique `identifier` (e.g., `com.servermonitor.myapp`).
+- **Start**: Load plist -> `launchctl load` -> `launchctl start`
+- **Stop**: `launchctl unload` (stops KeepAlive) or `launchctl stop` + `kill PID`
+- **Monitor**: Check `launchctl list` for PID and Exit Status.
 
-### Phase 3: iOS Companion (Future)
-- Monitor servers from phone
-- Push notifications on failures
-- Remote start/stop
-
-## Current Servers to Monitor
-
-### redo-web-app HTTPS Server
-- **Name:** `vision.salient.redo-https`
-- **Port:** 3443
-- **Command:** `node /Users/josephmalone/WebstormProjects/redo-web-app/https-server.js`
-- **Health check:** `curl -sk https://localhost:3443`
-
-### Add more servers as needed...
-
-## File Structure
-```
-server_monitor/
-├── CLAUDE.md           # This file
-├── launchd/            # .plist templates
-├── scripts/
-│   ├── install.sh      # Install all services
-│   ├── uninstall.sh    # Remove all services
-│   ├── status.sh       # Check all services
-│   └── monitor.sh      # Continuous monitoring with alerts
-├── logs/               # Service logs
-└── ServerMonitor/      # Future: Xcode project for menu bar app
+### 2. Configuration (`services.json`)
+```json
+{
+  "services": [
+    {
+      "name": "My App",
+      "identifier": "com.user.my-app",
+      "path": "/absolute/path/to/project",
+      "command": ["npm", "run", "dev"],
+      "port": 3000,
+      "healthCheck": "http://localhost:3000",
+      "enabled": true
+    }
+  ]
+}
 ```
 
-## launchd Plist Structure
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>vision.salient.SERVICE_NAME</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/executable</string>
-        <string>arg1</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/path/to/workdir</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/Users/josephmalone/ios_code/server_monitor/logs/SERVICE_NAME.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Users/josephmalone/ios_code/server_monitor/logs/SERVICE_NAME.error.log</string>
-</dict>
-</plist>
-```
+### 3. Packaging & Distribution
+- **Scripts**: Located in `scripts/`.
+- **Build**: `./scripts/build_installer.sh` creates `ServerMonitor.pkg` (App + CLI).
+- **Uninstall**: `./scripts/uninstall.sh` removes App and CLI.
 
-## Commands Reference
-```bash
-# Load a service
-launchctl load ~/Library/LaunchAgents/vision.salient.SERVICE.plist
+## Common Tasks
 
-# Unload a service  
-launchctl unload ~/Library/LaunchAgents/vision.salient.SERVICE.plist
+### Adding a New Command/Feature
+1. **CLI**: Add to `cli/src/commands/`. Register in `cli/src/index.js`.
+2. **App**: Add to `ServiceMonitor.swift` (ViewModel) and UI in `ServerMonitorApp.swift`.
+3. **Parity**: Ensure both CLI and App can perform the action.
 
-# Check if running
-launchctl list | grep salient
+### Debugging Services
+- **Logs**: Check `~/ios_code/server_monitor/logs/` (or configured logDir).
+- **Status**: Run `sm status` or check the Menu Bar App.
+- **Launchd**: `launchctl list | grep <identifier>`
 
-# View logs
-tail -f ~/ios_code/server_monitor/logs/SERVICE_NAME.log
-```
+## Development Guidelines
+- **Swift**: Use MVVM. Keep Views simple. Logic goes in `ServiceMonitor` or `LaunchAtLogin`.
+- **Node.js**: Use ES Modules. Use `execSync` for system calls. Keep logic platform-agnostic where possible (though this is a macOS tool).
+- **Testing**: `npm test` in `cli/`. Use `test:ci` for CI environments.
 
-## Why Servers Were Dying
-Previous approach: Started as background processes (`&`) from Clawdbot exec sessions.
-Problem: When exec session times out or Clawdbot restarts, orphaned processes may be killed.
+## Skill Routines
+If asked to "add a feature", verify:
+1. Does it need `launchd` changes? (e.g. Env vars, StandardOutPath)
+2. Does the CLI support it?
+3. Does the GUI support it?
+4. Is it persistent?
 
-Solution: launchd is the macOS init system - it manages services independently of any terminal or parent process. Services persist across:
-- Terminal closes
-- User logout/login  
-- System reboots
-- Parent process death
-
-## Future Enhancements
-- [x] Menu bar app with SwiftUI
-- [] Ensure launchd services persist across reboots
-- [] Ensure launchd services persist across user logout/login
-- [] Ensure Play, Stop, Restart buttons use ps kill and launchctl to control services
-- [ ] Slack/Discord webhook alerts
-- [ ] iOS companion app
-- [ ] Web dashboard
-- [ ] Automatic SSL cert renewal monitoring
-- [ ] Port conflict detection
+If asked to "debug":
+1. Check `sm logs <service> --error`
+2. Check `launchctl list` status code (0 = ok, 78 = config error, etc)

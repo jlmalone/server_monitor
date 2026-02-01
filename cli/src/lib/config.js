@@ -19,15 +19,26 @@ const DEFAULT_CONFIG = {
   services: []
 };
 
+// Check standard locations
+const APP_SUPPORT_CONFIG = join(homedir(), 'Library', 'Application Support', 'ServerMonitor', 'services.json');
+
 /**
  * Load the services configuration
  */
 export function loadConfig() {
-  if (!existsSync(CONFIG_PATH)) {
+  // Priority: 1. Current Directory (already set as CONFIG_PATH) 2. Application Support
+  let configPath = CONFIG_PATH;
+
+  // If local config doesn't exist but global does, use global
+  if (!existsSync(CONFIG_PATH) && existsSync(APP_SUPPORT_CONFIG)) {
+    configPath = APP_SUPPORT_CONFIG;
+  }
+
+  if (!existsSync(configPath)) {
     saveConfig(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;
   }
-  
+
   try {
     const content = readFileSync(CONFIG_PATH, 'utf-8');
     const config = JSON.parse(content);
@@ -55,10 +66,10 @@ export function saveConfig(config) {
  */
 export function getService(name) {
   const config = loadConfig();
-  return config.services.find(s => 
+  return config.services.find(s =>
     s.name.toLowerCase() === name.toLowerCase() ||
     s.identifier.toLowerCase().includes(name.toLowerCase())
-  );
+  ) || null;
 }
 
 /**
@@ -66,17 +77,17 @@ export function getService(name) {
  */
 export function addService(service) {
   const config = loadConfig();
-  
+
   // Check for duplicates
-  const exists = config.services.find(s => 
+  const exists = config.services.find(s =>
     s.name.toLowerCase() === service.name.toLowerCase() ||
     s.identifier === service.identifier
   );
-  
+
   if (exists) {
     throw new Error(`Service "${service.name}" already exists`);
   }
-  
+
   config.services.push(service);
   saveConfig(config);
   return config;
@@ -87,15 +98,15 @@ export function addService(service) {
  */
 export function removeService(name) {
   const config = loadConfig();
-  const index = config.services.findIndex(s => 
+  const index = config.services.findIndex(s =>
     s.name.toLowerCase() === name.toLowerCase() ||
     s.identifier.toLowerCase().includes(name.toLowerCase())
   );
-  
+
   if (index === -1) {
     throw new Error(`Service "${name}" not found`);
   }
-  
+
   const removed = config.services.splice(index, 1)[0];
   saveConfig(config);
   return removed;
@@ -106,14 +117,14 @@ export function removeService(name) {
  */
 export function updateService(name, updates) {
   const config = loadConfig();
-  const service = config.services.find(s => 
+  const service = config.services.find(s =>
     s.name.toLowerCase() === name.toLowerCase()
   );
-  
+
   if (!service) {
     throw new Error(`Service "${name}" not found`);
   }
-  
+
   Object.assign(service, updates);
   saveConfig(config);
   return service;

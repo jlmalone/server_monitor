@@ -109,11 +109,11 @@ check_process() {
     echo ""
 }
 
-show_all_jmalone_services() {
-    echo -e "${BOLD}${BLUE}═══ All jmalone LaunchD Services ═══${NC}"
+show_all_salient_services() {
+    echo -e "${BOLD}${BLUE}═══ All salient LaunchD Services ═══${NC}"
     echo ""
     
-    local services=$(launchctl list 2>/dev/null | grep "jmalone")
+    local services=$(launchctl list 2>/dev/null | grep "salient")
     
     if [ -n "$services" ]; then
         echo "$services" | while read line; do
@@ -128,7 +128,7 @@ show_all_jmalone_services() {
             fi
         done
     else
-        echo -e "  ${YELLOW}No jmalone services found${NC}"
+        echo -e "  ${YELLOW}No salient services found${NC}"
     fi
     echo ""
 }
@@ -156,8 +156,8 @@ show_active_ports() {
 show_summary() {
     echo -e "${BOLD}${BLUE}═══ Summary ═══${NC}"
     
-    local total=$(launchctl list 2>/dev/null | grep -c "jmalone" || echo "0")
-    local running=$(launchctl list 2>/dev/null | grep "jmalone" | awk '$1 != "-" && $1 != "0"' | wc -l | tr -d ' ')
+    local total=$(launchctl list 2>/dev/null | grep -c "salient" || echo "0")
+    local running=$(launchctl list 2>/dev/null | grep "salient" | awk '$1 != "-" && $1 != "0"' | wc -l | tr -d ' ')
     local stopped=$((total - running))
     
     echo "  Total services: $total"
@@ -194,7 +194,7 @@ echo -e "${BOLD}${BLUE}═══ Monitored Services ═══${NC}"
 echo ""
 
 # Check our known services
-check_launchd_service "com.jmalone.redo-https" "Redo HTTPS Server" "3443" "https://localhost:3443"
+check_launchd_service "vision.salient.redo-https" "Redo HTTPS Server" "3443" "https://localhost:3443"
 check_launchd_service "com.clawdbot.gateway" "Clawdbot Gateway" "3333" "http://localhost:3333/health"
 
 echo -e "${BOLD}${BLUE}═══ Additional Processes ═══${NC}"
@@ -202,7 +202,7 @@ echo ""
 check_process "log-server" "Redo Log Server" "3444"
 check_process "debug-server" "Redo Debug Server" "3445"
 
-show_all_jmalone_services
+show_all_salient_services
 show_active_ports
 show_summary
 show_quick_commands

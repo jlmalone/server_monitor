@@ -115,9 +115,9 @@ echo ""
 
 # Verify nothing is running
 echo "Verification:"
-remaining=$(launchctl list 2>/dev/null | grep "jmalone" | grep -v "grep")
+remaining=$(launchctl list 2>/dev/null | grep "salient" | grep -v "grep")
 if [ -z "$remaining" ]; then
-    echo -e "  ${GREEN}✓${NC} No jmalone services running"
+    echo -e "  ${GREEN}✓${NC} No salient services running"
 else
     echo -e "  ${YELLOW}⚠${NC} Some services still present:"
     echo "$remaining" | sed 's/^/    /'

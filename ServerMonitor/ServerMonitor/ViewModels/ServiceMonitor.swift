@@ -33,7 +33,7 @@ class ServiceMonitor: ObservableObject {
         services = [
             Service(
                 name: "Redo HTTPS Server",
-                identifier: "com.jmalone.redo-https",
+                identifier: "vision.salient.redo-https",
                 port: 3443,
                 healthCheckURL: "https://localhost:3443",
                 critical: true

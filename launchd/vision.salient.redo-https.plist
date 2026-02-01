@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.jmalone.redo-https</string>
+    <string>vision.salient.redo-https</string>
     <key>ProgramArguments</key>
     <array>
         <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/node</string>

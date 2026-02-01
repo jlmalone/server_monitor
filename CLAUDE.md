@@ -28,7 +28,7 @@ A macOS native solution to:
 ## Current Servers to Monitor
 
 ### redo-web-app HTTPS Server
-- **Name:** `com.jmalone.redo-https`
+- **Name:** `vision.salient.redo-https`
 - **Port:** 3443
 - **Command:** `node /Users/josephmalone/WebstormProjects/redo-web-app/https-server.js`
 - **Health check:** `curl -sk https://localhost:3443`
@@ -56,7 +56,7 @@ server_monitor/
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.jmalone.SERVICE_NAME</string>
+    <string>vision.salient.SERVICE_NAME</string>
     <key>ProgramArguments</key>
     <array>
         <string>/path/to/executable</string>
@@ -79,13 +79,13 @@ server_monitor/
 ## Commands Reference
 ```bash
 # Load a service
-launchctl load ~/Library/LaunchAgents/com.jmalone.SERVICE.plist
+launchctl load ~/Library/LaunchAgents/vision.salient.SERVICE.plist
 
 # Unload a service  
-launchctl unload ~/Library/LaunchAgents/com.jmalone.SERVICE.plist
+launchctl unload ~/Library/LaunchAgents/vision.salient.SERVICE.plist
 
 # Check if running
-launchctl list | grep jmalone
+launchctl list | grep salient
 
 # View logs
 tail -f ~/ios_code/server_monitor/logs/SERVICE_NAME.log

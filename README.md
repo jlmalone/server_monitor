@@ -21,14 +21,14 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 
 ### Option 1: Download DMG (Recommended)
 
-1. Download the latest `ServerMonitor-x.x.x.dmg` from [GitHub Releases](https://github.com/yourusername/server-monitor/releases)
+1. Download the latest `ServerMonitor-x.x.x.dmg` from [GitHub Releases](https://github.com/jlmalone/server_monitor/releases)
 2. Open the DMG and drag **Server Monitor** to Applications
 3. Launch Server Monitor from Applications
 
 ### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/yourusername/server-monitor.git
+git clone https://github.com/jlmalone/server_monitor.git
 cd server-monitor
 
 # Build the app

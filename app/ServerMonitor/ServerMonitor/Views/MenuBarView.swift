@@ -10,32 +10,80 @@ struct MenuBarView: View {
                 Text("Server Monitor")
                     .font(.headline)
                 Spacer()
-                if let lastUpdate = monitor.lastUpdate {
-                    Text(lastUpdate, style: .time)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Text("\(monitor.runningCount)/\(monitor.totalCount)")
+                    .font(.caption)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(monitor.overallStatus == .running ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                    .foregroundColor(monitor.overallStatus == .running ? .green : .red)
+                    .cornerRadius(4)
             }
             .padding(.horizontal)
             .padding(.vertical, 10)
             
-            Divider()
-            
-            // Services list
-            ForEach(monitor.services) { service in
-                ServiceRowView(service: service, monitor: monitor)
+            if let lastUpdate = monitor.lastUpdate {
+                Text("Updated \(lastUpdate, style: .relative) ago")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
             }
             
             Divider()
             
-            // Actions
+            // Services list
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(monitor.services) { service in
+                        ServiceRowView(service: service, monitor: monitor)
+                    }
+                }
+            }
+            .frame(maxHeight: 300)
+            
+            Divider()
+            
+            // Bulk actions
+            HStack(spacing: 12) {
+                Button(action: { monitor.startAll() }) {
+                    Label("Start All", systemImage: "play.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .disabled(monitor.overallStatus == .running)
+                
+                Button(action: { monitor.stopAll() }) {
+                    Label("Stop All", systemImage: "stop.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .disabled(monitor.runningCount == 0)
+                
+                Button(action: { monitor.restartAll() }) {
+                    Label("Restart All", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            
+            Divider()
+            
+            // Footer actions
             HStack {
-                Button("Refresh") {
-                    monitor.checkAllServices()
+                Button(action: { monitor.reloadConfig() }) {
+                    Label("Reload Config", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption)
                 }
                 .buttonStyle(.borderless)
                 
                 Spacer()
+                
+                Button("Refresh") {
+                    monitor.checkAllServices()
+                }
+                .buttonStyle(.borderless)
                 
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
@@ -45,7 +93,7 @@ struct MenuBarView: View {
             .padding(.horizontal)
             .padding(.vertical, 10)
         }
-        .frame(width: 300)
+        .frame(width: 320)
     }
 }
 
@@ -76,7 +124,13 @@ struct ServiceRowView: View {
                     if let port = service.port {
                         Text(":\(port)")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    if service.status == .stopped {
+                        Text("Stopped")
+                            .font(.caption)
+                            .foregroundColor(.red)
                     }
                     
                     if let error = service.errorMessage {
@@ -89,13 +143,14 @@ struct ServiceRowView: View {
             
             Spacer()
             
-            // Control buttons
+            // Control buttons (always visible on hover)
             if isHovering {
                 HStack(spacing: 4) {
                     if service.status == .running {
                         Button(action: { monitor.stopService(service) }) {
                             Image(systemName: "stop.fill")
                                 .font(.caption)
+                                .foregroundColor(.red)
                         }
                         .buttonStyle(.borderless)
                         .help("Stop")
@@ -103,6 +158,7 @@ struct ServiceRowView: View {
                         Button(action: { monitor.restartService(service) }) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.caption)
+                                .foregroundColor(.orange)
                         }
                         .buttonStyle(.borderless)
                         .help("Restart")
@@ -110,6 +166,7 @@ struct ServiceRowView: View {
                         Button(action: { monitor.startService(service) }) {
                             Image(systemName: "play.fill")
                                 .font(.caption)
+                                .foregroundColor(.green)
                         }
                         .buttonStyle(.borderless)
                         .help("Start")
@@ -121,7 +178,9 @@ struct ServiceRowView: View {
         .padding(.vertical, 8)
         .background(isHovering ? Color.gray.opacity(0.1) : Color.clear)
         .onHover { hovering in
-            isHovering = hovering
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
         }
     }
 }

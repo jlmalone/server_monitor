@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "settings": {
+    "logDir": "/Users/josephmalone/ios_code/server_monitor/logs",
+    "identifierPrefix": "vision.salient",
+    "plistDir": "/Users/josephmalone/ios_code/server_monitor/launchd",
+    "launchAgentsDir": "/Users/josephmalone/Library/LaunchAgents",
+    "nodePath": "/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/node"
+  },
+  "services": [
+    {
+      "name": "Redo HTTPS",
+      "identifier": "vision.salient.redo-https",
+      "path": "/Users/josephmalone/WebstormProjects/redo-web-app",
+      "command": ["node", "https-server.js"],
+      "port": 3000,
+      "healthCheck": "https://localhost:3000",
+      "enabled": true
+    },
+    {
+      "name": "Universe",
+      "identifier": "vision.salient.universe",
+      "path": "/Users/josephmalone/clawd/universe/web",
+      "command": ["npx", "vite", "--port", "4001", "--host"],
+      "port": 4001,
+      "healthCheck": "http://localhost:4001",
+      "enabled": true
+    },
+    {
+      "name": "Vision",
+      "identifier": "vision.salient.vision",
+      "path": "/Users/josephmalone/WebstormProjects/Salient/vision-web",
+      "command": ["npx", "vite", "--port", "4002", "--host"],
+      "port": 4002,
+      "healthCheck": "http://localhost:4002",
+      "enabled": true
+    },
+    {
+      "name": "Numina",
+      "identifier": "vision.salient.numina",
+      "path": "/Users/josephmalone/WebstormProjects/Numina/web",
+      "command": ["npx", "vite", "--port", "4003", "--host"],
+      "port": 4003,
+      "healthCheck": "http://localhost:4003",
+      "enabled": true
+    },
+    {
+      "name": "Knomee",
+      "identifier": "vision.salient.knomee",
+      "path": "/Users/josephmalone/WebstormProjects/knomee/web",
+      "command": ["npx", "vite", "--port", "4004", "--host"],
+      "port": 4004,
+      "healthCheck": "http://localhost:4004",
+      "enabled": true
+    }
+  ]
+}

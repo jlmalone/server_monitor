@@ -32,7 +32,7 @@ program
   .option('-P, --port <port>', 'Port number', parseInt)
   .option('-c, --cmd <command>', 'Command to run (default: npm run dev)')
   .option('-h, --health <url>', 'Health check URL')
-  .option('--no-install', 'Add to config only, don\'t install to launchd')
+  .option('-s, --start', 'Install and start immediately after adding')
   .action(addCommand);
 
 // Remove command
@@ -41,6 +41,7 @@ program
   .alias('rm')
   .description('Remove a service')
   .option('--keep-config', 'Keep in config, just uninstall from launchd')
+  .option('--clean-logs', 'Also delete log files')
   .action(removeCommand);
 
 // List command

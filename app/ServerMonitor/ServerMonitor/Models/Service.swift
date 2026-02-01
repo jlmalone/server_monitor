@@ -27,35 +27,42 @@ enum ServiceStatus: String, Codable {
 }
 
 struct Service: Identifiable, Codable {
-    let id: UUID
-    let name: String
-    let identifier: String  // launchd identifier
-    let port: Int?
-    let healthCheckURL: String?
-    let critical: Bool
+    var id: UUID
+    var name: String
+    var identifier: String  // launchd identifier
+    var port: Int?
+    var healthCheckURL: String?
+    var critical: Bool
     
     // Config fields
     var path: String?
     var command: [String]?
     var enabled: Bool?
+    var keepAlive: Bool?
+    var environmentVariables: [String: String]?
     
+    // Runtime state (not persisted)
     var status: ServiceStatus = .unknown
     var pid: Int?
     var lastChecked: Date?
     var errorMessage: String?
     
-    init(id: UUID = UUID(), name: String, identifier: String, port: Int? = nil, healthCheckURL: String? = nil, critical: Bool = true) {
+    init(id: UUID = UUID(), name: String, identifier: String, port: Int? = nil, healthCheckURL: String? = nil, critical: Bool = true, path: String? = nil, command: [String]? = nil, enabled: Bool = true, keepAlive: Bool = true) {
         self.id = id
         self.name = name
         self.identifier = identifier
         self.port = port
         self.healthCheckURL = healthCheckURL
         self.critical = critical
-        self.enabled = true
+        self.path = path
+        self.command = command
+        self.enabled = enabled
+        self.keepAlive = keepAlive
     }
     
     enum CodingKeys: String, CodingKey {
         case id, name, identifier, port, healthCheckURL, critical
+        case path, command, enabled, keepAlive, environmentVariables
     }
 }
 

@@ -46,20 +46,21 @@ export async function addCommand(options) {
       port: options.port || null,
       healthCheck,
       enabled: true,
+      keepAlive: true,
       createdAt: new Date().toISOString()
     };
     
     spinner.text = 'Saving configuration...';
     
-    // Add to config
+    // Add to config (services.json) - plist will be generated on start
     addService(service);
     
-    // Install to launchd unless --no-install
-    if (options.install !== false) {
-      spinner.text = 'Installing to launchd...';
+    // Only install immediately if --start flag is passed
+    if (options.start) {
+      spinner.text = 'Installing and starting service...';
       const { destPath } = installService(service);
       
-      spinner.succeed(chalk.green(`Service "${options.name}" added and installed!`));
+      spinner.succeed(chalk.green(`Service "${options.name}" added and started!`));
       console.log('');
       console.log(chalk.dim('  Identifier:'), identifier);
       console.log(chalk.dim('  Path:'), servicePath);
@@ -72,8 +73,17 @@ export async function addCommand(options) {
       console.log(chalk.cyan('The service should start automatically.'));
       console.log(chalk.dim(`Run 'sm status ${options.name}' to check.`));
     } else {
-      spinner.succeed(chalk.green(`Service "${options.name}" added to config`));
-      console.log(chalk.yellow('Run `sm start ' + options.name + '` to install and start.'));
+      // Just save to config - plist generated on 'sm start'
+      spinner.succeed(chalk.green(`Service "${options.name}" added to configuration`));
+      console.log('');
+      console.log(chalk.dim('  Identifier:'), identifier);
+      console.log(chalk.dim('  Path:'), servicePath);
+      console.log(chalk.dim('  Command:'), command.join(' '));
+      if (options.port) {
+        console.log(chalk.dim('  Port:'), options.port);
+      }
+      console.log('');
+      console.log(chalk.cyan(`Run 'sm start ${options.name}' to generate plist and start the service.`));
     }
     
   } catch (err) {

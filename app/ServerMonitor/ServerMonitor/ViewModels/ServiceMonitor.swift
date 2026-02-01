@@ -61,17 +61,36 @@ class ServiceMonitor: ObservableObject {
                     
                     // enabled defaults to true if not specified
                     let enabled = dict["enabled"] as? Bool ?? true
-                    guard enabled else { return nil }
+                    // Load but don't filter - show disabled services in GUI
                     
                     let port = dict["port"] as? Int
                     let healthCheck = dict["healthCheck"] as? String
                     let path = dict["path"] as? String
                     let command = dict["command"] as? [String]
+                    // keepAlive can be bool or object like { "SuccessfulExit": false }
+                    let keepAlive: Bool
+                    if let keepAliveValue = dict["keepAlive"] as? Bool {
+                        keepAlive = keepAliveValue
+                    } else if let _ = dict["keepAlive"] as? [String: Any] {
+                        // If it's an object (e.g., {"SuccessfulExit": false}), treat as true (keeping alive)
+                        keepAlive = true
+                    } else {
+                        keepAlive = true // default
+                    }
+                    let envVars = dict["environmentVariables"] as? [String: String]
 
-                    var service = Service(name: name, identifier: identifier, port: port, healthCheckURL: healthCheck)
-                    service.path = path
-                    service.command = command
-                    service.enabled = enabled
+                    var service = Service(
+                        name: name,
+                        identifier: identifier,
+                        port: port,
+                        healthCheckURL: healthCheck,
+                        critical: true,
+                        path: path,
+                        command: command,
+                        enabled: enabled,
+                        keepAlive: keepAlive
+                    )
+                    service.environmentVariables = envVars
                     return service
                 }
 
@@ -212,13 +231,41 @@ class ServiceMonitor: ObservableObject {
         
         // Build EnvironmentVariables
         let nodePath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/local/bin:/usr/bin:/bin"
+        var envDict = ["PATH": nodePath]
+        if let customEnv = service.environmentVariables {
+            for (key, value) in customEnv {
+                envDict[key] = value
+            }
+        }
+        let envEntries = envDict.map { key, value in
+            """
+                    <key>\(escapeXML(key))</key>
+                    <string>\(escapeXML(value))</string>
+            """
+        }.joined(separator: "\n")
         let envXML = """
             <key>EnvironmentVariables</key>
             <dict>
-                <key>PATH</key>
-                <string>\(escapeXML(nodePath))</string>
+        \(envEntries)
             </dict>
         """
+        
+        // Build KeepAlive based on service setting
+        let keepAliveXML: String
+        if service.keepAlive ?? true {
+            keepAliveXML = """
+            <key>KeepAlive</key>
+            <dict>
+                <key>SuccessfulExit</key>
+                <false/>
+            </dict>
+        """
+        } else {
+            keepAliveXML = """
+            <key>KeepAlive</key>
+            <false/>
+        """
+        }
         
         // Ensure log directory exists
         try? FileManager.default.createDirectory(atPath: resolvedLogDir, withIntermediateDirectories: true)
@@ -235,11 +282,7 @@ class ServiceMonitor: ObservableObject {
     \(workingDirXML)
     <key>RunAtLoad</key>
     <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
+    \(keepAliveXML)
     <key>ThrottleInterval</key>
     <integer>10</integer>
     <key>StandardOutPath</key>
@@ -435,12 +478,61 @@ class ServiceMonitor: ObservableObject {
     func add(service: Service) {
         services.append(service)
         saveServices()
-        // Try to start it
-        startService(service)
+        // Try to start it if enabled
+        if service.enabled ?? true {
+            startService(service)
+        }
+    }
+    
+    func update(service: Service) {
+        guard let index = services.firstIndex(where: { $0.id == service.id }) else {
+            print("⚠️ Service not found for update: \(service.identifier)")
+            return
+        }
+        
+        let wasRunning = services[index].status == .running
+        let wasEnabled = services[index].enabled ?? true
+        let nowEnabled = service.enabled ?? true
+        
+        // Stop the old service if it was running
+        if wasRunning {
+            stopService(services[index])
+        }
+        
+        // Remove old plist if identifier changed (shouldn't happen but be safe)
+        if services[index].identifier != service.identifier {
+            let oldPlistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(services[index].identifier).plist"
+            try? FileManager.default.removeItem(atPath: oldPlistPath)
+        }
+        
+        // Update the service
+        services[index] = service
+        saveServices()
+        
+        // Restart if it was running or if we're enabling a previously disabled service
+        if wasRunning || (!wasEnabled && nowEnabled) {
+            if nowEnabled {
+                startService(service)
+            }
+        }
     }
     
     func remove(service: Service) {
+        // Stop the service
         stopService(service)
+        
+        // Remove plist file
+        let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
+        do {
+            if FileManager.default.fileExists(atPath: plistPath) {
+                try FileManager.default.removeItem(atPath: plistPath)
+                print("✅ Removed plist: \(plistPath)")
+            }
+        } catch {
+            print("⚠️ Failed to remove plist: \(error)")
+        }
+        
+        // Remove from services list
         services.removeAll { $0.id == service.id }
         saveServices()
     }
@@ -450,6 +542,7 @@ class ServiceMonitor: ObservableObject {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let appSupport = homeDir.appendingPathComponent("Library/Application Support/ServerMonitor")
         let configPath = appSupport.appendingPathComponent("services.json")
+        let tempPath = appSupport.appendingPathComponent("services.json.tmp")
         
         do {
             if !FileManager.default.fileExists(atPath: appSupport.path) {
@@ -460,18 +553,20 @@ class ServiceMonitor: ObservableObject {
                 var dict: [String: Any] = [
                     "name": service.name,
                     "identifier": service.identifier,
-                    "enabled": service.enabled ?? true
+                    "enabled": service.enabled ?? true,
+                    "keepAlive": service.keepAlive ?? true
                 ]
                 if let port = service.port { dict["port"] = port }
                 if let health = service.healthCheckURL { dict["healthCheck"] = health }
                 if let path = service.path { dict["path"] = path }
                 if let cmd = service.command { dict["command"] = cmd }
+                if let env = service.environmentVariables, !env.isEmpty { dict["environmentVariables"] = env }
                 return dict
             }
             
             let settings: [String: Any] = [
-                "logDir": "./logs", // Default
-                "identifierPrefix": "com.servermonitor"
+                "logDir": logDir,
+                "identifierPrefix": identifierPrefix
             ]
             
             let json: [String: Any] = [
@@ -480,12 +575,22 @@ class ServiceMonitor: ObservableObject {
                 "services": servicesData
             ]
             
-            let data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
-            try data.write(to: configPath)
+            // Atomic write: write to temp file, then rename
+            let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: tempPath)
+            
+            // Remove existing file if present
+            if FileManager.default.fileExists(atPath: configPath.path) {
+                try FileManager.default.removeItem(at: configPath)
+            }
+            
+            try FileManager.default.moveItem(at: tempPath, to: configPath)
             
             print("✅ Saved config to \(configPath.path)")
         } catch {
             print("❌ Failed to save config: \(error)")
+            // Clean up temp file if it exists
+            try? FileManager.default.removeItem(at: tempPath)
         }
     }
 }

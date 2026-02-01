@@ -1,10 +1,11 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { loadConfig, getService } from '../lib/config.js';
-import { startService, getServiceStatus, installService } from '../lib/launchd.js';
+import { startService, getServiceStatus, generateAndWritePlist } from '../lib/launchd.js';
 
 export async function startCommand(name, options) {
   const config = loadConfig();
+  const { settings } = config;
   
   // Determine which services to start
   let services;
@@ -38,14 +39,13 @@ export async function startCommand(name, options) {
         continue;
       }
       
-      // If not loaded, install first
-      if (!status.loaded) {
-        spinner.text = `Installing ${service.name}...`;
-        installService(service);
-      } else {
-        // Just start it
-        startService(service.identifier);
-      }
+      // Generate/update plist from services.json before starting
+      spinner.text = `Generating plist for ${service.name}...`;
+      const { destPath } = generateAndWritePlist(service, settings);
+      
+      // Start the service (will bootstrap if not loaded, kickstart if loaded)
+      spinner.text = `Starting ${service.name}...`;
+      startService(service.identifier, service);
       
       // Wait a moment and check status
       await new Promise(r => setTimeout(r, 1500));

@@ -30,7 +30,7 @@ export async function stopCommand(name, options) {
     const spinner = ora(`Stopping ${service.name}...`).start();
     
     try {
-      // Check if already stopped
+      // Check current status
       const status = getServiceStatus(service.identifier);
       
       if (!status.loaded) {
@@ -39,17 +39,24 @@ export async function stopCommand(name, options) {
       }
       
       if (!status.running) {
-        spinner.info(chalk.dim(`${service.name} already stopped`));
+        // Still bootout to fully unload (plist regenerated on next start)
+        spinner.text = `Unloading ${service.name}...`;
+        stopService(service.identifier, false);
+        spinner.info(chalk.dim(`${service.name} was stopped, now unloaded`));
         continue;
       }
       
-      stopService(service.identifier);
+      // Stop and bootout the service (uses modern launchctl bootout)
+      // Plist will be regenerated from services.json on next 'sm start'
+      stopService(service.identifier, false);
       
       // Wait and verify
       await new Promise(r => setTimeout(r, 1000));
       const newStatus = getServiceStatus(service.identifier);
       
-      if (!newStatus.running) {
+      if (!newStatus.running && !newStatus.loaded) {
+        spinner.succeed(chalk.green(`${service.name} stopped and unloaded`));
+      } else if (!newStatus.running) {
         spinner.succeed(chalk.green(`${service.name} stopped`));
       } else {
         spinner.warn(chalk.yellow(`${service.name} may still be stopping...`));

@@ -83,7 +83,8 @@ program
 program
   .command('logs <name>')
   .description('Tail logs for a service')
-  .option('-f, --follow', 'Follow log output (default: true)', true)
+  .option('-f, --follow', 'Follow log output', true)
+  .option('-F, --no-follow', 'Don\'t follow, just print')
   .option('-n, --lines <n>', 'Number of lines to show', '50')
   .option('-e, --error', 'Show error log instead of stdout')
   .action(logsCommand);

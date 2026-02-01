@@ -10,6 +10,10 @@ class ServiceMonitor: ObservableObject {
     private var timer: Timer?
     private var lastStatuses: [String: ServiceStatus] = [:]
     
+    // Settings loaded from config
+    private var logDir: String = "./logs"
+    private var identifierPrefix: String = "com.servermonitor"
+    
     init() {
         loadServicesFromConfig()
         requestNotificationPermission()
@@ -41,18 +45,39 @@ class ServiceMonitor: ObservableObject {
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let servicesArray = json["services"] as? [[String: Any]] {
 
+                // Load settings if present
+                if let settings = json["settings"] as? [String: Any] {
+                    if let logDirSetting = settings["logDir"] as? String {
+                        self.logDir = logDirSetting
+                    }
+                    if let prefixSetting = settings["identifierPrefix"] as? String {
+                        self.identifierPrefix = prefixSetting
+                    }
+                }
+
                 services = servicesArray.compactMap { dict in
                     guard let name = dict["name"] as? String,
-                          let identifier = dict["identifier"] as? String,
-                          let port = dict["port"] as? Int,
-                          let healthCheck = dict["healthCheck"] as? String,
-                          let enabled = dict["enabled"] as? Bool,
-                          enabled else { return nil }
+                          let identifier = dict["identifier"] as? String else { return nil }
+                    
+                    // enabled defaults to true if not specified
+                    let enabled = dict["enabled"] as? Bool ?? true
+                    guard enabled else { return nil }
+                    
+                    let port = dict["port"] as? Int
+                    let healthCheck = dict["healthCheck"] as? String
+                    let path = dict["path"] as? String
+                    let command = dict["command"] as? [String]
 
-                    return Service(name: name, identifier: identifier, port: port, healthCheckURL: healthCheck)
+                    var service = Service(name: name, identifier: identifier, port: port, healthCheckURL: healthCheck)
+                    service.path = path
+                    service.command = command
+                    service.enabled = enabled
+                    return service
                 }
 
                 if !services.isEmpty {
+                    print("✅ Loaded \(services.count) services from \(path.path)")
+                    print("   Log directory: \(logDir)")
                     return
                 }
             }
@@ -122,51 +147,235 @@ class ServiceMonitor: ObservableObject {
         return (.stopped, nil)
     }
     
-    func startService(_ service: Service) {
-        let (status, _) = checkService(service.identifier)
-
-        // If not loaded, load the plist first
-        if status == .stopped {
-            let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
-            let loadTask = Process()
-            loadTask.launchPath = "/bin/launchctl"
-            loadTask.arguments = ["load", plistPath]
-            try? loadTask.run()
-            loadTask.waitUntilExit()
-
-            // Wait a moment for load to complete
-            Thread.sleep(forTimeInterval: 0.5)
+    // MARK: - Plist Generation
+    
+    /// Escape XML special characters
+    private func escapeXML(_ str: String) -> String {
+        str.replacingOccurrences(of: "&", with: "&amp;")
+           .replacingOccurrences(of: "<", with: "&lt;")
+           .replacingOccurrences(of: ">", with: "&gt;")
+           .replacingOccurrences(of: "\"", with: "&quot;")
+    }
+    
+    /// Resolve log directory path (expand ~ and relative paths)
+    private func resolveLogDir() -> String {
+        var resolved = logDir
+        if resolved.hasPrefix("~") {
+            resolved = NSHomeDirectory() + String(resolved.dropFirst())
+        } else if resolved.hasPrefix("./") || !resolved.hasPrefix("/") {
+            // Relative to Application Support
+            let homeDir = FileManager.default.homeDirectoryForCurrentUser
+            let appSupport = homeDir.appendingPathComponent("Library/Application Support/ServerMonitor")
+            if resolved.hasPrefix("./") {
+                resolved = appSupport.appendingPathComponent(String(resolved.dropFirst(2))).path
+            } else {
+                resolved = appSupport.appendingPathComponent(resolved).path
+            }
         }
-
-        // Now start the service
-        let task = Process()
-        task.launchPath = "/bin/launchctl"
-        task.arguments = ["start", service.identifier]
-        try? task.run()
-        task.waitUntilExit()
+        return resolved
+    }
+    
+    /// Generate launchd plist XML from service configuration
+    /// - Parameter service: Service object with configuration
+    /// - Returns: Valid plist XML string matching Node.js output format
+    func generatePlistXML(service: Service) -> String {
+        let label = escapeXML(service.identifier)
+        let resolvedLogDir = resolveLogDir()
+        
+        // Extract short name for log files (last component of identifier)
+        let shortName = service.identifier.split(separator: ".").last.map(String.init) ?? service.identifier
+        
+        // Build ProgramArguments from command array
+        var programArgsXML = ""
+        if let command = service.command, !command.isEmpty {
+            let argsXML = command.map { "        <string>\(escapeXML($0))</string>" }.joined(separator: "\n")
+            programArgsXML = """
+                <key>ProgramArguments</key>
+                <array>
+            \(argsXML)
+                </array>
+            """
+        }
+        
+        // Build WorkingDirectory if path is set
+        var workingDirXML = ""
+        if let path = service.path {
+            var resolvedPath = path
+            if resolvedPath.hasPrefix("~") {
+                resolvedPath = NSHomeDirectory() + String(resolvedPath.dropFirst())
+            }
+            workingDirXML = """
+                <key>WorkingDirectory</key>
+                <string>\(escapeXML(resolvedPath))</string>
+            """
+        }
+        
+        // Build EnvironmentVariables
+        let nodePath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/local/bin:/usr/bin:/bin"
+        let envXML = """
+            <key>EnvironmentVariables</key>
+            <dict>
+                <key>PATH</key>
+                <string>\(escapeXML(nodePath))</string>
+            </dict>
+        """
+        
+        // Ensure log directory exists
+        try? FileManager.default.createDirectory(atPath: resolvedLogDir, withIntermediateDirectories: true)
+        
+        // Generate the full plist XML
+        let plist = """
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>\(label)</string>
+    \(programArgsXML)
+    \(workingDirXML)
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>\(escapeXML(resolvedLogDir))/\(escapeXML(shortName)).log</string>
+    <key>StandardErrorPath</key>
+    <string>\(escapeXML(resolvedLogDir))/\(escapeXML(shortName)).error.log</string>
+    \(envXML)
+</dict>
+</plist>
+"""
+        return plist
+    }
+    
+    /// Write plist atomically (temp file then rename)
+    private func writePlistAtomically(xml: String, to path: String) throws {
+        let tempPath = path + ".tmp"
+        try xml.write(toFile: tempPath, atomically: true, encoding: .utf8)
+        
+        // Remove existing file if present
+        if FileManager.default.fileExists(atPath: path) {
+            try FileManager.default.removeItem(atPath: path)
+        }
+        
+        try FileManager.default.moveItem(atPath: tempPath, toPath: path)
+    }
+    
+    func startService(_ service: Service) {
+        let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
+        let uid = getuid()
+        let domain = "gui/\(uid)"
+        
+        // 1. Generate plist XML if we have command configuration
+        if service.command != nil && !service.command!.isEmpty {
+            let plistXML = generatePlistXML(service: service)
+            do {
+                try writePlistAtomically(xml: plistXML, to: plistPath)
+                print("✅ Generated plist at \(plistPath)")
+            } catch {
+                print("❌ Failed to write plist: \(error)")
+            }
+        }
+        
+        // 2. Check if already loaded
+        let (status, _) = checkService(service.identifier)
+        
+        if status == .stopped {
+            // 3. Use modern launchctl bootstrap (not deprecated load)
+            let bootstrapTask = Process()
+            bootstrapTask.launchPath = "/bin/launchctl"
+            bootstrapTask.arguments = ["bootstrap", domain, plistPath]
+            
+            let pipe = Pipe()
+            bootstrapTask.standardError = pipe
+            
+            do {
+                try bootstrapTask.run()
+                bootstrapTask.waitUntilExit()
+                
+                if bootstrapTask.terminationStatus != 0 {
+                    let errorData = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let errorMsg = String(data: errorData, encoding: .utf8) ?? ""
+                    
+                    // If already loaded (error 37), use kickstart instead
+                    if errorMsg.contains("37") || errorMsg.contains("already loaded") {
+                        print("ℹ️ Service already loaded, using kickstart")
+                        kickstartService(identifier: service.identifier, domain: domain)
+                    } else {
+                        print("⚠️ Bootstrap failed: \(errorMsg)")
+                    }
+                }
+            } catch {
+                print("❌ Failed to run bootstrap: \(error)")
+            }
+        } else {
+            // Already loaded, use kickstart to restart
+            kickstartService(identifier: service.identifier, domain: domain)
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.checkAllServices() }
     }
     
+    /// Use launchctl kickstart to start/restart a loaded service
+    private func kickstartService(identifier: String, domain: String) {
+        let kickTask = Process()
+        kickTask.launchPath = "/bin/launchctl"
+        kickTask.arguments = ["kickstart", "-k", "\(domain)/\(identifier)"]
+        try? kickTask.run()
+        kickTask.waitUntilExit()
+    }
+    
     func stopService(_ service: Service) {
-        // Get PID before stopping
+        let uid = getuid()
+        let domain = "gui/\(uid)"
+        let serviceTarget = "\(domain)/\(service.identifier)"
+        
+        // Get PID before stopping (for fallback)
         let (_, pid) = checkService(service.identifier)
 
-        // Method 1: Unload the service (prevents KeepAlive from restarting)
-        let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
-        let unloadTask = Process()
-        unloadTask.launchPath = "/bin/launchctl"
-        unloadTask.arguments = ["unload", plistPath]
-        try? unloadTask.run()
-        unloadTask.waitUntilExit()
-
-        // Method 2: Kill PID directly as backup
-        if let pid = pid {
-            let killTask = Process()
-            killTask.launchPath = "/bin/kill"
-            killTask.arguments = ["\(pid)"]
-            try? killTask.run()
-            killTask.waitUntilExit()
+        // Method 1: Use modern launchctl bootout (not deprecated unload)
+        let bootoutTask = Process()
+        bootoutTask.launchPath = "/bin/launchctl"
+        bootoutTask.arguments = ["bootout", serviceTarget]
+        
+        let pipe = Pipe()
+        bootoutTask.standardError = pipe
+        
+        do {
+            try bootoutTask.run()
+            bootoutTask.waitUntilExit()
+            
+            if bootoutTask.terminationStatus != 0 {
+                let errorData = pipe.fileHandleForReading.readDataToEndOfFile()
+                let errorMsg = String(data: errorData, encoding: .utf8) ?? ""
+                print("⚠️ Bootout warning: \(errorMsg)")
+                
+                // Fallback: try kill -9 if bootout failed
+                if let pid = pid {
+                    print("ℹ️ Using kill as fallback")
+                    let killTask = Process()
+                    killTask.launchPath = "/bin/kill"
+                    killTask.arguments = ["-9", "\(pid)"]
+                    try? killTask.run()
+                    killTask.waitUntilExit()
+                }
+            }
+        } catch {
+            print("❌ Failed to run bootout: \(error)")
+            
+            // Fallback: Kill PID directly
+            if let pid = pid {
+                let killTask = Process()
+                killTask.launchPath = "/bin/kill"
+                killTask.arguments = ["-9", "\(pid)"]
+                try? killTask.run()
+                killTask.waitUntilExit()
+            }
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.checkAllServices() }

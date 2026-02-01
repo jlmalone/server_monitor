@@ -160,10 +160,29 @@ export function getServiceStatus(identifier) {
 
 /**
  * Start a service
+ * Loads the plist if not loaded, then starts
  */
 export function startService(identifier) {
   try {
-    execSync(`launchctl start "${identifier}"`, { stdio: 'pipe' });
+    const status = getServiceStatus(identifier);
+
+    // If not loaded, load the plist first
+    if (!status.loaded) {
+      const config = loadConfig();
+      const { settings } = config;
+      const launchAgentsDir = expandPath(settings.launchAgentsDir);
+      const plistPath = join(launchAgentsDir, `${identifier}.plist`);
+
+      if (existsSync(plistPath)) {
+        execSync(`launchctl load "${plistPath}"`, { stdio: 'pipe' });
+      } else {
+        throw new Error(`Plist not found: ${plistPath}`);
+      }
+    } else {
+      // Already loaded, just start it
+      execSync(`launchctl start "${identifier}"`, { stdio: 'pipe' });
+    }
+
     return true;
   } catch (err) {
     throw new Error(`Failed to start service: ${err.message}`);
@@ -172,10 +191,36 @@ export function startService(identifier) {
 
 /**
  * Stop a service
+ * Uses unload to truly stop (prevents KeepAlive from restarting)
  */
 export function stopService(identifier) {
   try {
-    execSync(`launchctl stop "${identifier}"`, { stdio: 'pipe' });
+    // Get PID before stopping
+    const status = getServiceStatus(identifier);
+    const pid = status.pid;
+
+    // Method 1: Unload the service (this prevents KeepAlive from restarting)
+    const config = loadConfig();
+    const { settings } = config;
+    const launchAgentsDir = expandPath(settings.launchAgentsDir);
+    const plistPath = join(launchAgentsDir, `${identifier}.plist`);
+
+    try {
+      execSync(`launchctl unload "${plistPath}"`, { stdio: 'pipe' });
+    } catch (err) {
+      // If unload fails, try stop
+      execSync(`launchctl stop "${identifier}"`, { stdio: 'ignore' });
+    }
+
+    // Method 2: Kill PID directly as backup
+    if (pid) {
+      try {
+        execSync(`kill ${pid}`, { stdio: 'ignore' });
+      } catch (err) {
+        // Process might already be dead, ignore
+      }
+    }
+
     return true;
   } catch (err) {
     throw new Error(`Failed to stop service: ${err.message}`);
@@ -184,11 +229,31 @@ export function stopService(identifier) {
 
 /**
  * Restart a service
+ * Uses both launchctl and kill to ensure clean restart
  */
 export function restartService(identifier) {
-  stopService(identifier);
+  // Get PID before stopping
+  const status = getServiceStatus(identifier);
+  const pid = status.pid;
+
+  // Stop via launchctl
+  try {
+    execSync(`launchctl stop "${identifier}"`, { stdio: 'pipe' });
+  } catch (err) {
+    // Continue even if stop fails
+  }
+
+  // Kill PID directly as backup
+  if (pid) {
+    try {
+      execSync(`kill ${pid}`, { stdio: 'ignore' });
+    } catch (err) {
+      // Process might already be dead
+    }
+  }
+
   // Small delay before starting
-  execSync('sleep 1');
+  execSync('sleep 2');
   startService(identifier);
   return true;
 }

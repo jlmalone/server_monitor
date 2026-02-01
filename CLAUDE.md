@@ -102,7 +102,10 @@ Solution: launchd is the macOS init system - it manages services independently o
 - Parent process death
 
 ## Future Enhancements
-- [ ] Menu bar app with SwiftUI
+- [x] Menu bar app with SwiftUI
+- [] Ensure launchd services persist across reboots
+- [] Ensure launchd services persist across user logout/login
+- [] Ensure Play, Stop, Restart buttons use ps kill and launchctl to control services
 - [ ] Slack/Discord webhook alerts
 - [ ] iOS companion app
 - [ ] Web dashboard

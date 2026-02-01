@@ -88,20 +88,52 @@ class ServiceMonitor: ObservableObject {
     }
     
     func startService(_ service: Service) {
+        let (status, _) = checkService(service.identifier)
+
+        // If not loaded, load the plist first
+        if status == .stopped {
+            let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
+            let loadTask = Process()
+            loadTask.launchPath = "/bin/launchctl"
+            loadTask.arguments = ["load", plistPath]
+            try? loadTask.run()
+            loadTask.waitUntilExit()
+
+            // Wait a moment for load to complete
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+
+        // Now start the service
         let task = Process()
         task.launchPath = "/bin/launchctl"
         task.arguments = ["start", service.identifier]
         try? task.run()
         task.waitUntilExit()
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.checkAllServices() }
     }
     
     func stopService(_ service: Service) {
-        let task = Process()
-        task.launchPath = "/bin/launchctl"
-        task.arguments = ["stop", service.identifier]
-        try? task.run()
-        task.waitUntilExit()
+        // Get PID before stopping
+        let (_, pid) = checkService(service.identifier)
+
+        // Method 1: Unload the service (prevents KeepAlive from restarting)
+        let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(service.identifier).plist"
+        let unloadTask = Process()
+        unloadTask.launchPath = "/bin/launchctl"
+        unloadTask.arguments = ["unload", plistPath]
+        try? unloadTask.run()
+        unloadTask.waitUntilExit()
+
+        // Method 2: Kill PID directly as backup
+        if let pid = pid {
+            let killTask = Process()
+            killTask.launchPath = "/bin/kill"
+            killTask.arguments = ["\(pid)"]
+            try? killTask.run()
+            killTask.waitUntilExit()
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.checkAllServices() }
     }
     
@@ -123,5 +155,36 @@ class ServiceMonitor: ObservableObject {
         if services.allSatisfy({ $0.status == .running }) { return .running }
         else if services.contains(where: { $0.status == .stopped }) { return .stopped }
         return .unknown
+    }
+    
+    var runningCount: Int {
+        services.filter { $0.status == .running }.count
+    }
+    
+    var totalCount: Int {
+        services.count
+    }
+    
+    func startAll() {
+        for service in services where service.status != .running {
+            startService(service)
+        }
+    }
+    
+    func stopAll() {
+        for service in services where service.status == .running {
+            stopService(service)
+        }
+    }
+    
+    func restartAll() {
+        for service in services {
+            restartService(service)
+        }
+    }
+    
+    func reloadConfig() {
+        // For now, just refresh statuses
+        checkAllServices()
     }
 }

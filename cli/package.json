@@ -34,6 +34,9 @@
     "eslint": "^9.0.0"
   },
   "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "test:watch": "node --test --watch test/**/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/**/*.test.js",
     "lint": "eslint src/",
     "link": "npm link",
     "unlink": "npm unlink -g @salient/server-monitor"

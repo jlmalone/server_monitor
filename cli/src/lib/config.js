@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
   version: '2.0.0',
   settings: {
     logDir: join(PROJECT_ROOT, 'logs'),
-    identifierPrefix: 'vision.salient',
+    identifierPrefix: 'com.servermonitor',
     plistDir: join(PROJECT_ROOT, 'launchd'),
     launchAgentsDir: join(homedir(), 'Library', 'LaunchAgents'),
     nodePath: process.execPath

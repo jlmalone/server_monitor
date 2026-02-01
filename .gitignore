@@ -4,6 +4,12 @@ node_modules/
 
 # Logs (keep directory, ignore contents)
 logs/*.log
+logs/*.error.log
+
+# User-specific configuration (generated per-machine)
+services.json
+launchd/
+config/services.json
 
 # macOS
 .DS_Store
@@ -14,6 +20,7 @@ logs/*.log
 app/ServerMonitor/ServerMonitor.xcodeproj/project.xcworkspace/
 app/ServerMonitor/ServerMonitor.xcodeproj/xcuserdata/
 app/ServerMonitor/DerivedData/
+app/ServerMonitor/build/
 *.xcuserstate
 
 # Build outputs

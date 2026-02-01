@@ -1,184 +1,133 @@
 import Foundation
 import SwiftUI
-import Combine
 import UserNotifications
 
 @MainActor
 class ServiceMonitor: ObservableObject {
-    @Published var services: [Service] = []
-    @Published var isChecking = false
+    @Published var services: [Service] = [
+        Service(name: "Redo HTTPS", identifier: "vision.salient.redo-https", port: 3000, healthCheckURL: "https://localhost:3000"),
+        Service(name: "Universe", identifier: "vision.salient.universe", port: 3001, healthCheckURL: "http://localhost:3001"),
+        Service(name: "Vision", identifier: "vision.salient.vision", port: 3002, healthCheckURL: "http://localhost:3002"),
+        Service(name: "Numina", identifier: "vision.salient.numina", port: 3003, healthCheckURL: "http://localhost:3003"),
+        Service(name: "Knomee", identifier: "vision.salient.knomee", port: 3004, healthCheckURL: "http://localhost:3004")
+    ]
+    
     @Published var lastUpdate: Date?
-    
     private var timer: Timer?
-    private let checkInterval: TimeInterval = 5.0
-    
-    var overallStatus: OverallStatus {
-        if isChecking { return .checking }
-        let running = services.filter { $0.status == .running }.count
-        let total = services.count
-        
-        if total == 0 { return .checking }
-        if running == total { return .allHealthy }
-        if running == 0 { return .allDown }
-        return .someDown
-    }
+    private var lastStatuses: [String: ServiceStatus] = [:]
     
     init() {
-        loadDefaultServices()
         requestNotificationPermission()
         startMonitoring()
     }
     
-    private func loadDefaultServices() {
-        services = [
-            Service(
-                name: "Redo HTTPS Server",
-                identifier: "vision.salient.redo-https",
-                port: 3443,
-                healthCheckURL: "https://localhost:3443",
-                critical: true
-            ),
-            Service(
-                name: "Clawdbot Gateway",
-                identifier: "com.clawdbot.gateway",
-                port: 3333,
-                healthCheckURL: "http://localhost:3333/health",
-                critical: true
-            )
-        ]
-    }
-    
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error)")
-            }
-        }
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
     
     func startMonitoring() {
         checkAllServices()
-        
-        timer = Timer.scheduledTimer(withTimeInterval: checkInterval, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkAllServices()
             }
         }
     }
     
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
     func checkAllServices() {
-        isChecking = true
-        
         for i in services.indices {
-            checkService(at: i)
+            let service = services[i]
+            let (status, pid) = checkService(service.identifier)
+            
+            // Check for status change and notify
+            if let lastStatus = lastStatuses[service.identifier],
+               lastStatus == .running && status == .stopped {
+                sendNotification(serviceName: service.name)
+            }
+            lastStatuses[service.identifier] = status
+            
+            services[i].status = status
+            services[i].pid = pid
         }
-        
-        isChecking = false
         lastUpdate = Date()
     }
     
-    private func checkService(at index: Int) {
-        let service = services[index]
-        let previousStatus = service.status
-        
-        // Check via launchctl
-        let result = runCommand("launchctl list | grep '\(service.identifier)'")
-        
-        if let output = result, !output.isEmpty {
-            let components = output.split(separator: "\t")
-            if components.count >= 1 {
-                let pidString = String(components[0])
-                if pidString != "-" && pidString != "0", let pid = Int(pidString) {
-                    services[index].status = .running
-                    services[index].pid = pid
-                    services[index].errorMessage = nil
-                } else {
-                    services[index].status = .stopped
-                    services[index].pid = nil
-                    let exitCode = components.count >= 2 ? String(components[1]) : "unknown"
-                    services[index].errorMessage = "Exit code: \(exitCode)"
-                }
-            }
-        } else {
-            services[index].status = .stopped
-            services[index].pid = nil
-            services[index].errorMessage = "Not loaded in launchd"
-        }
-        
-        services[index].lastChecked = Date()
-        
-        // Send notification if status changed to stopped
-        if previousStatus == .running && services[index].status == .stopped {
-            sendNotification(for: services[index])
-        }
-    }
-    
-    private func runCommand(_ command: String) -> String? {
+    func checkService(_ identifier: String) -> (ServiceStatus, Int?) {
         let task = Process()
-        let pipe = Pipe()
+        task.launchPath = "/bin/launchctl"
+        task.arguments = ["list", identifier]
         
+        let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = pipe
-        task.arguments = ["-c", command]
-        task.launchPath = "/bin/zsh"
         
         do {
             try task.run()
             task.waitUntilExit()
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch {
-            return nil
-        }
+            let output = String(data: data, encoding: .utf8) ?? ""
+            
+            if task.terminationStatus == 0 && !output.contains("Could not find") {
+                // Parse PID from launchctl list output
+                if let pidMatch = output.range(of: #"\"PID\" = (\d+)"#, options: .regularExpression) {
+                    let pidStr = output[pidMatch].replacingOccurrences(of: "\"PID\" = ", with: "")
+                    if let pid = Int(pidStr) {
+                        return (.running, pid)
+                    }
+                }
+                return (.running, nil)
+            }
+        } catch {}
+        
+        return (.stopped, nil)
     }
     
     func startService(_ service: Service) {
-        _ = runCommand("launchctl start \(service.identifier)")
-        
-        // Wait a moment then recheck
+        let task = Process()
+        task.launchPath = "/bin/launchctl"
+        task.arguments = ["start", service.identifier]
+        try? task.run()
+        task.waitUntilExit()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             self.checkAllServices()
         }
     }
     
     func stopService(_ service: Service) {
-        _ = runCommand("launchctl stop \(service.identifier)")
-        
+        let task = Process()
+        task.launchPath = "/bin/launchctl"
+        task.arguments = ["stop", service.identifier]
+        try? task.run()
+        task.waitUntilExit()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             self.checkAllServices()
         }
     }
     
     func restartService(_ service: Service) {
-        _ = runCommand("launchctl stop \(service.identifier)")
-        
+        stopService(service)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            _ = self.runCommand("launchctl start \(service.identifier)")
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                self.checkAllServices()
-            }
+            self.startService(service)
         }
     }
     
-    private func sendNotification(for service: Service) {
+    func sendNotification(serviceName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Service Down"
-        content.body = "\(service.name) has stopped"
+        content.body = "\(serviceName) has stopped running"
         content.sound = .default
         
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+    
+    var overallStatus: ServiceStatus {
+        if services.allSatisfy({ $0.status == .running }) {
+            return .running
+        } else if services.contains(where: { $0.status == .stopped }) {
+            return .stopped
+        }
+        return .unknown
     }
 }

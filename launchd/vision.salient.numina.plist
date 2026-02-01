@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>vision.salient.numina</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin/npx</string>
+        <string>vite</string>
+        <string>--port</string>
+        <string>3003</string>
+        <string>--host</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/josephmalone/WebstormProjects/numina-web</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/josephmalone/ios_code/server_monitor/logs/numina.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/josephmalone/ios_code/server_monitor/logs/numina.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/josephmalone/.nvm/versions/node/v24.13.0/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

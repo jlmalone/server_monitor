@@ -43,6 +43,15 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 echo "   ✅ Build succeeded"
 
+# Step 1b: Copy app icon into bundle (Xcode project doesn't include it properly)
+echo ""
+echo "🎨 Adding app icon to bundle..."
+mkdir -p "$APP_PATH/Contents/Resources"
+cp "$PROJECT_ROOT/app/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP_PATH/Contents/Info.plist" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$APP_PATH/Contents/Info.plist"
+echo "   ✅ App icon added"
+
 # Step 2: Sign the app with hardened runtime
 echo ""
 echo "🔐 Step 2/6: Signing app with hardened runtime..."

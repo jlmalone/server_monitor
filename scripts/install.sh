@@ -35,7 +35,7 @@ done
 
 echo ""
 echo "📊 Service status:"
-launchctl list | grep jmalone || echo "  No services found"
+launchctl list | grep salient || echo "  No services found"
 
 echo ""
 echo "📁 Logs at: $PROJECT_DIR/logs/"

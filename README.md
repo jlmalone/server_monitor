@@ -33,7 +33,7 @@ cd ~/ios_code/server_monitor
 
 | Service | Port | LaunchD ID |
 |---------|------|------------|
-| Redo HTTPS Server | 3443 | `com.servermonitor.redo-https` |
+| Redo HTTPS Server | 3443 | `vision.salient.redo-https` |
 | Clawdbot Gateway | 3333 | `com.clawdbot.gateway` |
 
 ## 📁 Project Structure
@@ -45,7 +45,7 @@ server_monitor/
 ├── config/
 │   └── services.json   # Service definitions
 ├── launchd/            # Plist templates
-│   └── com.servermonitor.redo-https.plist
+│   └── vision.salient.redo-https.plist
 ├── scripts/
 │   ├── install.sh      # Install services to launchd
 │   ├── uninstall.sh    # Remove services
@@ -103,7 +103,7 @@ Features:
 
 ### 1. Create a plist file
 
-Create `launchd/com.servermonitor.YOUR-SERVICE.plist`:
+Create `launchd/vision.salient.YOUR-SERVICE.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -111,7 +111,7 @@ Create `launchd/com.servermonitor.YOUR-SERVICE.plist`:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.servermonitor.YOUR-SERVICE</string>
+    <string>vision.salient.YOUR-SERVICE</string>
     <key>ProgramArguments</key>
     <array>
         <string>/path/to/node</string>
@@ -139,7 +139,7 @@ Create `launchd/com.servermonitor.YOUR-SERVICE.plist`:
 Add your service to the check list in `scripts/status.sh`:
 
 ```bash
-check_launchd_service "com.servermonitor.YOUR-SERVICE" "Your Service Name" "PORT" "http://localhost:PORT/health"
+check_launchd_service "vision.salient.YOUR-SERVICE" "Your Service Name" "PORT" "http://localhost:PORT/health"
 ```
 
 ### 3. Reinstall
@@ -151,20 +151,20 @@ check_launchd_service "com.servermonitor.YOUR-SERVICE" "Your Service Name" "PORT
 ## 🔧 Manual launchd Commands
 
 ```bash
-# List all jmalone services
-launchctl list | grep jmalone
+# List all salient services
+launchctl list | grep salient
 
 # Stop a service
-launchctl stop com.servermonitor.redo-https
+launchctl stop vision.salient.redo-https
 
 # Start a service
-launchctl start com.servermonitor.redo-https
+launchctl start vision.salient.redo-https
 
 # Unload (remove from launchd)
-launchctl unload ~/Library/LaunchAgents/com.servermonitor.redo-https.plist
+launchctl unload ~/Library/LaunchAgents/vision.salient.redo-https.plist
 
 # Load (add to launchd)
-launchctl load ~/Library/LaunchAgents/com.servermonitor.redo-https.plist
+launchctl load ~/Library/LaunchAgents/vision.salient.redo-https.plist
 
 # View logs
 tail -f ~/ios_code/server_monitor/logs/redo-https.log
@@ -198,7 +198,7 @@ All service logs go to `~/ios_code/server_monitor/logs/`:
 ### Service won't start
 ```bash
 # Check for syntax errors in plist
-plutil ~/Library/LaunchAgents/com.servermonitor.redo-https.plist
+plutil ~/Library/LaunchAgents/vision.salient.redo-https.plist
 
 # Check launchd status
 launchctl list | grep redo-https

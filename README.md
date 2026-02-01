@@ -1,225 +1,207 @@
-# Server Monitor for macOS
+# Server Monitor 🖥️
 
-A lightweight system to run development servers as persistent launchd services with health monitoring.
+[![macOS](https://img.shields.io/badge/macOS-14+-blue?logo=apple)](https://www.apple.com/macos/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-## 🎯 Why?
+A lightweight macOS dev server manager using native `launchd` for reliable, persistent services.
 
-Development servers started from terminals or background processes die when:
-- Terminal closes
-- Parent process times out
-- System reboots
+## ✨ Features
 
-**Solution:** Use macOS `launchd` - the proper way to run persistent services.
+- **🔧 CLI Tool (`sm`)** - Manage services from the terminal
+- **📱 Menu Bar App** - Quick status view and controls
+- **🤖 LLM Integration** - Natural language server management
+- **🔄 Auto-restart** - launchd automatically restarts crashed services
+- **📊 Health Checks** - HTTP health monitoring
+- **📝 Centralized Logs** - All logs in one place
 
 ## 🚀 Quick Start
 
+### Install CLI
+
 ```bash
-cd ~/ios_code/server_monitor
-
-# Install all services
-./scripts/install.sh
-
-# Check status
-./scripts/status.sh
-
-# Monitor continuously (with alerts)
-./scripts/monitor.sh &
-
-# Uninstall when done
-./scripts/uninstall.sh
+cd ~/ios_code/server_monitor/cli
+npm install
+npm link
 ```
 
-## 📋 Currently Monitored Services
+### Basic Usage
 
-| Service | Port | LaunchD ID |
-|---------|------|------------|
-| Redo HTTPS Server | 3443 | `vision.salient.redo-https` |
-| Clawdbot Gateway | 3333 | `com.clawdbot.gateway` |
+```bash
+# List all services
+sm list
 
-## 📁 Project Structure
+# Check detailed status
+sm status
+
+# Start/stop/restart
+sm start universe
+sm stop numina
+sm restart --all
+
+# View logs
+sm logs universe
+sm logs knomee --error
+
+# Add a new service
+sm add --name "My App" --path ~/myproject --port 5000
+```
+
+## 📸 Screenshots
+
+### CLI Output
+```
+┌────────────┬──────┬───────────┬───────┬───────────────────────────┐
+│ Service    │ Port │ Status    │ PID   │ Identifier                │
+├────────────┼──────┼───────────┼───────┼───────────────────────────┤
+│ Universe   │ 4001 │ ● Running │ 37695 │ vision.salient.universe   │
+│ Vision     │ 4002 │ ● Running │ 37700 │ vision.salient.vision     │
+│ Numina     │ 4003 │ ● Running │ 37685 │ vision.salient.numina     │
+│ Knomee     │ 4004 │ ● Running │ 37680 │ vision.salient.knomee     │
+└────────────┴──────┴───────────┴───────┴───────────────────────────┘
+
+✓ All 4 services running
+```
+
+### Menu Bar App
+The SwiftUI menu bar app shows service status at a glance with hover controls for quick start/stop/restart.
+
+## 📋 Commands
+
+| Command | Description |
+|---------|-------------|
+| `sm list` | List all services with status |
+| `sm status [name]` | Detailed health check |
+| `sm start <name\|--all>` | Start service(s) |
+| `sm stop <name\|--all>` | Stop service(s) |
+| `sm restart <name\|--all>` | Restart service(s) |
+| `sm logs <name>` | Tail service logs |
+| `sm add [options]` | Add new service |
+| `sm remove <name>` | Remove a service |
+
+### Add Options
+```bash
+sm add \
+  --name "My Server" \
+  --path ~/project \
+  --port 4005 \
+  --cmd "npm run dev" \
+  --health "http://localhost:4005/health"
+```
+
+## 🏗️ Architecture
 
 ```
 server_monitor/
-├── CLAUDE.md           # AI instructions
-├── README.md           # This file
-├── config/
-│   └── services.json   # Service definitions
-├── launchd/            # Plist templates
-│   └── vision.salient.redo-https.plist
-├── scripts/
-│   ├── install.sh      # Install services to launchd
-│   ├── uninstall.sh    # Remove services
-│   ├── status.sh       # Check all services
-│   └── monitor.sh      # Continuous monitoring with alerts
-├── logs/               # Service logs
-└── ServerMonitor/      # (Future) SwiftUI menu bar app
+├── cli/                 # Node.js CLI tool (sm command)
+│   ├── src/commands/    # Command implementations
+│   └── src/lib/         # Config, launchd, health utilities
+├── app/                 # SwiftUI menu bar app
+│   └── ServerMonitor/
+├── skill/               # Clawdbot LLM integration
+│   ├── SKILL.md         # LLM instructions
+│   └── examples.md      # Usage examples
+├── launchd/             # Generated plist files
+├── logs/                # Service stdout/stderr logs
+├── services.json        # Central service registry
+└── scripts/             # Legacy shell scripts
 ```
 
-## 🛠️ Scripts
+## ⚙️ Configuration
 
-### install.sh
-Copies plist files to `~/Library/LaunchAgents/` and loads them into launchd.
+Services are defined in `services.json`:
 
-```bash
-./scripts/install.sh
+```json
+{
+  "version": "2.0.0",
+  "settings": {
+    "logDir": "/path/to/logs",
+    "identifierPrefix": "vision.salient"
+  },
+  "services": [
+    {
+      "name": "My App",
+      "identifier": "vision.salient.my-app",
+      "path": "/path/to/project",
+      "command": ["npx", "vite", "--port", "4001"],
+      "port": 4001,
+      "healthCheck": "http://localhost:4001",
+      "enabled": true
+    }
+  ]
+}
 ```
 
-### uninstall.sh
-Stops and removes all managed services.
+## 🍎 Why launchd?
 
-```bash
-./scripts/uninstall.sh           # Remove services and archive logs
-./scripts/uninstall.sh --keep-logs  # Keep log files
-```
+Unlike background processes started from terminals:
 
-### status.sh
-Shows status of all monitored services with health checks.
+- ✅ **Survives terminal close** - Services keep running
+- ✅ **Survives logout** - Optional: can run as system daemon
+- ✅ **Auto-restart** - Crashed services restart automatically
+- ✅ **Boot persistence** - Services start at login
+- ✅ **Native macOS** - No third-party process managers
 
-```bash
-./scripts/status.sh
-```
+## 🤖 LLM Integration
 
-Output includes:
-- Running/stopped status with PIDs
-- Port listening status
-- HTTP health check results
-- Log file locations and sizes
-- Summary of all services
+The `skill/` directory enables natural language server management:
 
-### monitor.sh
-Runs a continuous monitoring loop with macOS notifications.
+- "What servers are running?"
+- "Stop the universe server"
+- "Show me the logs for numina"
+- "Add a dev server for ~/myproject on port 4005"
 
-```bash
-./scripts/monitor.sh &    # Run in background
-```
-
-Features:
-- 5-second check interval
-- macOS desktop notifications on failures
-- Auto-restart attempts
-- State tracking (only alerts on change)
-
-## 📝 Adding New Services
-
-### 1. Create a plist file
-
-Create `launchd/vision.salient.YOUR-SERVICE.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>vision.salient.YOUR-SERVICE</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/node</string>
-        <string>/path/to/your-server.js</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/path/to/project</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>/Users/jlmalone/ios_code/server_monitor/logs/YOUR-SERVICE.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Users/jlmalone/ios_code/server_monitor/logs/YOUR-SERVICE.error.log</string>
-</dict>
-</plist>
-```
-
-### 2. Update status.sh
-
-Add your service to the check list in `scripts/status.sh`:
-
-```bash
-check_launchd_service "vision.salient.YOUR-SERVICE" "Your Service Name" "PORT" "http://localhost:PORT/health"
-```
-
-### 3. Reinstall
-
-```bash
-./scripts/install.sh
-```
+See [skill/SKILL.md](./skill/SKILL.md) for integration details.
 
 ## 🔧 Manual launchd Commands
 
 ```bash
-# List all salient services
+# List managed services
 launchctl list | grep salient
 
 # Stop a service
-launchctl stop vision.salient.redo-https
+launchctl stop vision.salient.universe
 
 # Start a service
-launchctl start vision.salient.redo-https
+launchctl start vision.salient.universe
 
-# Unload (remove from launchd)
-launchctl unload ~/Library/LaunchAgents/vision.salient.redo-https.plist
-
-# Load (add to launchd)
-launchctl load ~/Library/LaunchAgents/vision.salient.redo-https.plist
+# Unload completely
+launchctl unload ~/Library/LaunchAgents/vision.salient.universe.plist
 
 # View logs
-tail -f ~/ios_code/server_monitor/logs/redo-https.log
+tail -f ~/ios_code/server_monitor/logs/universe.log
 ```
-
-## ⚡ Key launchd Features
-
-- **KeepAlive:** Auto-restart on crash
-- **RunAtLoad:** Start automatically at login
-- **ThrottleInterval:** Wait 10s between restart attempts
-- **WorkingDirectory:** Set the cwd for the process
-- **EnvironmentVariables:** Set PATH, NODE_ENV, etc.
-
-## 🔮 Future Plans
-
-- [ ] SwiftUI menu bar app with status indicators
-- [ ] One-click start/stop/restart
-- [ ] Log viewer in the app
-- [ ] iOS companion app with push notifications
-- [ ] Slack/Discord webhook alerts
-
-## 📊 Logs
-
-All service logs go to `~/ios_code/server_monitor/logs/`:
-- `redo-https.log` - stdout
-- `redo-https.error.log` - stderr
-- `monitor.log` - monitoring script output
 
 ## 🐛 Troubleshooting
 
 ### Service won't start
 ```bash
-# Check for syntax errors in plist
-plutil ~/Library/LaunchAgents/vision.salient.redo-https.plist
-
-# Check launchd status
-launchctl list | grep redo-https
-
 # Check error log
-cat ~/ios_code/server_monitor/logs/redo-https.error.log
+sm logs <name> --error
+
+# Validate plist
+plutil ~/Library/LaunchAgents/vision.salient.<name>.plist
+
+# Check port in use
+/usr/sbin/lsof -i :<port>
 ```
 
 ### Service keeps restarting
-Check the exit code in `launchctl list` - a non-zero exit means the process is crashing. Check error logs.
-
-### Port already in use
+Check the error log - the process is likely crashing:
 ```bash
-# Find what's using the port
-lsof -i :3443
-
-# Or use netstat
-netstat -an | grep 3443
+sm logs <name> --error
 ```
 
----
+### CLI command not found
+```bash
+cd ~/ios_code/server_monitor/cli && npm link
+```
 
-**Status:** ✅ Operational
-**Last Updated:** 2026-01-31
+## 📄 License
+
+MIT © jlmalone
+
+## 🙏 Contributing
+
+PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md).

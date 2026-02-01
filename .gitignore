@@ -1,1 +1,32 @@
-logs/
+# Dependencies
+cli/node_modules/
+node_modules/
+
+# Logs (keep directory, ignore contents)
+logs/*.log
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Xcode
+app/ServerMonitor/ServerMonitor.xcodeproj/project.xcworkspace/
+app/ServerMonitor/ServerMonitor.xcodeproj/xcuserdata/
+app/ServerMonitor/DerivedData/
+*.xcuserstate
+
+# Build outputs
+build/
+dist/
+*.app
+
+# IDE
+.idea/
+.vscode/
+
+# Config backups
+config/*.bak
+
+# npm
+package-lock.json

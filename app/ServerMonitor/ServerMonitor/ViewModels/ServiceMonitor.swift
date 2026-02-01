@@ -68,7 +68,7 @@ class ServiceMonitor: ObservableObject {
     
     func startMonitoring() {
         checkAllServices()
-        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkAllServices()
             }

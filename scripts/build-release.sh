@@ -9,8 +9,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 APP_NAME="ServerMonitor"
 VERSION="1.0.0"
-BUNDLE_ID="com.servermonitor.ServerMonitor"
-SIGNING_IDENTITY="Developer ID Application: jlmalone (44SCLSYCZZ)"
+BUNDLE_ID="${BUNDLE_ID:-com.servermonitor.app}"
 
 # Load credentials
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -18,15 +17,17 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
 elif [ -f "$SCRIPT_DIR/.env" ]; then
     source "$SCRIPT_DIR/.env"
 else
-    echo "❌ Error: .env file not found. Create one with APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD"
+    echo "❌ Error: .env file not found. Copy scripts/.env.example to .env and fill it in."
     exit 1
 fi
 
-if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$APPLE_APP_PASSWORD" ]; then
+if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$APPLE_APP_PASSWORD" ] || [ -z "$DEVELOPER_ID_IDENTITY" ]; then
     echo "❌ Error: Missing Apple credentials in .env"
-    echo "   Required: APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD"
+    echo "   Required: APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD, DEVELOPER_ID_IDENTITY"
     exit 1
 fi
+
+SIGNING_IDENTITY="$DEVELOPER_ID_IDENTITY"
 
 echo "🚀 Building $APP_NAME v$VERSION for release..."
 echo ""

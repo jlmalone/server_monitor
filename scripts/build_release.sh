@@ -10,10 +10,22 @@ cd "$PROJECT_ROOT"
 # Configuration
 ICON_SOURCE="${1:-app/icon-rounded.png}"
 APP_NAME="ServerMonitor"
-IDENTITY="Developer ID Application: jlmalone (44SCLSYCZZ)"
-TEAM_ID="44SCLSYCZZ"
-APPLE_ID="jlawrenceiv@gmail.com"
-APP_PASSWORD="${SERVERMONITOR_NOTARIZATION_PASSWORD:-scwg-gafm-zyma-iuzx}"
+
+# Load credentials from .env (see scripts/.env.example for format)
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a; . "$PROJECT_ROOT/.env"; set +a
+elif [ -f "$PROJECT_ROOT/scripts/.env" ]; then
+    set -a; . "$PROJECT_ROOT/scripts/.env"; set +a
+fi
+
+: "${DEVELOPER_ID_IDENTITY:?Set DEVELOPER_ID_IDENTITY in .env (e.g. 'Developer ID Application: Your Name (TEAMID)')}"
+: "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID in .env (10-char Team ID)}"
+: "${APPLE_ID:?Set APPLE_ID in .env (your Apple ID email)}"
+: "${APPLE_APP_PASSWORD:?Set APPLE_APP_PASSWORD in .env (app-specific password from appleid.apple.com)}"
+
+IDENTITY="$DEVELOPER_ID_IDENTITY"
+TEAM_ID="$APPLE_TEAM_ID"
+APP_PASSWORD="$APPLE_APP_PASSWORD"
 
 echo "🚀 ServerMonitor Release Build Pipeline"
 echo "========================================"

@@ -6,9 +6,22 @@ set -e
 
 APP_PATH="dist/ServerMonitor.app"
 DMG_PATH="dist/ServerMonitor.dmg"
-IDENTITY="Developer ID Application: jlmalone (44SCLSYCZZ)"
-BUNDLE_ID="com.servermonitor.servermonitor"
-TEAM_ID="44SCLSYCZZ"
+
+# Load credentials from .env (see scripts/.env.example)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a; . "$PROJECT_ROOT/.env"; set +a
+elif [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a; . "$SCRIPT_DIR/.env"; set +a
+fi
+
+: "${DEVELOPER_ID_IDENTITY:?Set DEVELOPER_ID_IDENTITY in .env}"
+: "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID in .env}"
+
+IDENTITY="$DEVELOPER_ID_IDENTITY"
+TEAM_ID="$APPLE_TEAM_ID"
+BUNDLE_ID="${BUNDLE_ID:-com.servermonitor.app}"
 
 echo "🔐 Step 1: Code signing app bundle..."
 codesign --force --options runtime --deep --sign "$IDENTITY" "$APP_PATH"

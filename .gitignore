@@ -36,6 +36,7 @@ app/ServerMonitor/build/
 
 # Config backups
 config/*.bak
+*.backup
 
 # npm
 # package-lock.json

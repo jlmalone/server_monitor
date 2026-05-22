@@ -3,7 +3,7 @@ import SwiftUI
 /// Compact "darkmesh protection" panel for the menu-bar dropdown.
 ///
 /// Renders a one-line headline (verdict + emoji) plus a small grid of probe
-/// indicators (Internet / DNS / Tailscale / transfer client-via-VPN) and a
+/// indicators (Internet / DNS / Tailscale / the transfer client-via-VPN) and a
 /// "last auto-disconnect" footnote when applicable. Tapping the row opens
 /// the full status file in Finder for forensics.
 struct DarkmeshStatusView: View {

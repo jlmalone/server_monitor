@@ -2,6 +2,14 @@
 
 **Description**: Development guide for the Server Monitor macOS ecosystem.
 
+## Active roadmap
+
+If working on darkmesh / VPN protection integration, read
+[ROADMAP.md](./ROADMAP.md) first. That document is authoritative for what's
+done, what's pending, the test plan, and the exit criterion (deletion of
+the SwiftBar plugin in the sibling `darkmesh-vpn-guard` repo). Don't add
+new darkmesh-related code without updating ROADMAP.md in the same commit.
+
 ## Architecture Overview
 
 Server Monitor manages development servers as persistent background services using macOS's native `launchd` system.

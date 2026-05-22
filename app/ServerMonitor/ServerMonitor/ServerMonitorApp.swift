@@ -3,15 +3,28 @@ import SwiftUI
 @main
 struct ServerMonitorApp: App {
     @StateObject private var monitor = ServiceMonitor()
+    @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @Environment(\.openWindow) var openWindow
-    
+
+    /// Combined menu-bar tint: red if either services or darkmesh is bad,
+    /// yellow if degraded, otherwise the services color (green/secondary).
+    /// "At a glance" the user sees the worst of the two systems.
+    private var combinedTint: Color {
+        if let v = darkmesh.status?.verdict, v == "NO-GO" { return .red }
+        if monitor.overallStatus == .stopped                { return .red }
+        if let v = darkmesh.status?.verdict, v == "DEGRADED" { return .yellow }
+        return monitor.overallStatus.color
+    }
+
     var body: some Scene {
         MenuBarExtra {
             VStack(spacing: 0) {
-                MenuBarView(monitor: monitor)
-                
+                DarkmeshStatusView(monitor: darkmesh)
                 Divider()
-                
+                MenuBarView(monitor: monitor)
+
+                Divider()
+
                 HStack {
                     Button(action: {
                         openWindow(id: "settings")
@@ -34,7 +47,7 @@ struct ServerMonitorApp: App {
         } label: {
             Image(systemName: monitor.overallStatus.icon)
                 .symbolRenderingMode(.palette)
-                .foregroundStyle(monitor.overallStatus.color)
+                .foregroundStyle(combinedTint)
         }
         .menuBarExtraStyle(.window)
 

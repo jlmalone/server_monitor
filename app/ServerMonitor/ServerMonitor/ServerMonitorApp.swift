@@ -5,6 +5,7 @@ struct ServerMonitorApp: App {
     @StateObject private var monitor = ServiceMonitor()
     @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @StateObject private var worker = WorkerStatusMonitor()
+    @StateObject private var transfers = TransfersMonitor()
     @Environment(\.openWindow) var openWindow
 
     /// Combined menu-bar tint. Green ONLY when darkmesh verdict is GO (VPN
@@ -24,6 +25,8 @@ struct ServerMonitorApp: App {
                 DarkmeshStatusView(monitor: darkmesh)
                 Divider()
                 WorkerStatusView(monitor: worker)
+                Divider()
+                TransfersView(monitor: transfers)
                 Divider()
                 MenuBarView(monitor: monitor)
 

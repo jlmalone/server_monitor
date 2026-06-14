@@ -115,3 +115,179 @@ final class WorkerStatusMonitor: ObservableObject {
         }
     }
 }
+
+// MARK: - Transfers panel
+//
+// Generic, config-driven file-transfer monitor. WHAT it watches — which command
+// prints the queue JSON, and which machines to poll — is machine-specific and
+// lives in untracked ~/.config/server-monitor/transfers.json (schema in
+// config/transfers.example.json). With no config the panel is inert. This
+// open-source code only runs the configured command(s), decodes raw-byte queue
+// JSON, and computes %/ETA for display — no host names or tool specifics here.
+
+struct TransfersSource: Codable {
+    var label: String      // machine label shown on each row, e.g. "this Mac"
+    var command: [String]  // argv that prints the queue JSON (run via a login shell);
+                           // remote example: ["ssh","<host>","nice","-n","19", ...]
+}
+
+struct TransfersConfig: Codable {
+    var sources: [TransfersSource]
+    var pollSeconds: Double?
+
+    static func load() -> TransfersConfig? {
+        let path = (NSHomeDirectory() as NSString)
+            .appendingPathComponent(".config/server-monitor/transfers.json")
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        return try? JSONDecoder().decode(TransfersConfig.self, from: data)
+    }
+}
+
+// Decoded directly from the queue tool's `--json` output (raw bytes; we derive the rest).
+struct TransfersQueueItem: Codable {
+    let id: String
+    let source: String
+    let dest: String
+    let status: String
+    let mode: String
+    let bytesTransferred: Int64
+    let bytesTotal: Int64
+    let filesDone: Int
+    let filesTotal: Int
+    let rateBytesPerSec: Int64
+    let currentFile: String
+}
+
+struct TransfersQueueSummary: Codable { let running: Int; let pending: Int; let failed: Int }
+struct TransfersQueueReport: Codable { let queue: [TransfersQueueItem]; let summary: TransfersQueueSummary }
+
+struct TransferRow: Identifiable {
+    let id: String
+    let machine: String
+    let title: String
+    let status: String
+    let pctText: String?
+    let rateText: String?
+    let etaText: String?
+    let sortPct: Int
+}
+
+@MainActor
+final class TransfersMonitor: ObservableObject {
+    @Published private(set) var rows: [TransferRow] = []
+    @Published private(set) var running = 0
+    @Published private(set) var pending = 0
+    @Published private(set) var failed = 0
+    @Published private(set) var lastError: String?
+    let configured: Bool
+
+    private let config: TransfersConfig?
+    private var timer: Timer?
+
+    init() {
+        self.config = TransfersConfig.load()
+        self.configured = (config != nil)
+        guard let cfg = config else { return }
+        let interval = cfg.pollSeconds ?? 60
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+    }
+
+    deinit { timer?.invalidate() }
+
+    var headline: String {
+        if !configured { return "not configured" }
+        if running == 0 && pending == 0 && failed == 0 { return lastError ?? "no transfers" }
+        var parts: [String] = []
+        if running > 0 { parts.append("\(running) running") }
+        if pending > 0 { parts.append("\(pending) pending") }
+        if failed > 0 { parts.append("\(failed) failed") }
+        return parts.joined(separator: ", ")
+    }
+
+    var headlineColor: Color {
+        if !configured { return .secondary }
+        if failed > 0 { return .orange }
+        if running > 0 { return .green }
+        return .secondary
+    }
+
+    func refresh() {
+        guard let cfg = config else { return }
+        Task.detached {
+            var allRows: [TransferRow] = []
+            var r = 0, p = 0, f = 0
+            var err: String? = nil
+            for src in cfg.sources {
+                guard let data = Self.runCommand(src.command),
+                      let report = try? JSONDecoder().decode(TransfersQueueReport.self, from: data) else {
+                    err = "\u{2018}\(src.label)\u{2019} unreachable"
+                    continue
+                }
+                r += report.summary.running
+                p += report.summary.pending
+                f += report.summary.failed
+                for item in report.queue where item.status == "running" || item.status == "pending" || item.status == "failed" {
+                    allRows.append(Self.toRow(item, machine: src.label))
+                }
+            }
+            let rank: [String: Int] = ["running": 0, "pending": 1, "failed": 2]
+            allRows.sort {
+                let a = rank[$0.status] ?? 9, b = rank[$1.status] ?? 9
+                return a != b ? a < b : $0.sortPct > $1.sortPct
+            }
+            let fRows = allRows, fr = r, fp = p, ff = f, fe = err
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.rows = fRows
+                self.running = fr
+                self.pending = fp
+                self.failed = ff
+                self.lastError = fe
+            }
+        }
+    }
+
+    private nonisolated static func runCommand(_ argv: [String]) -> Data? {
+        guard !argv.isEmpty else { return nil }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        // Login shell for the user's PATH; pass argv POSITIONALLY so nothing is
+        // interpolated into a shell string (no injection from config values).
+        p.arguments = ["-lc", "exec \"$@\"", "transfers"] + argv
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return data
+    }
+
+    private nonisolated static func toRow(_ i: TransfersQueueItem, machine: String) -> TransferRow {
+        let title = (i.source as NSString).lastPathComponent
+        let pct: Int? = i.bytesTotal > 0
+            ? Int((Double(i.bytesTransferred) / Double(i.bytesTotal) * 100).rounded()) : nil
+        let isRunning = i.status == "running" && i.rateBytesPerSec > 0
+        let rateText: String? = isRunning ? formatRate(i.rateBytesPerSec) : nil
+        let etaText: String? = (isRunning && i.bytesTotal > i.bytesTransferred)
+            ? "ETA " + formatDuration(Int((i.bytesTotal - i.bytesTransferred) / i.rateBytesPerSec)) : nil
+        return TransferRow(
+            id: "\(machine):\(i.id)", machine: machine, title: title, status: i.status,
+            pctText: pct.map { "\($0)%" }, rateText: rateText, etaText: etaText, sortPct: pct ?? -1
+        )
+    }
+
+    private nonisolated static func formatRate(_ bps: Int64) -> String {
+        let mb = Double(bps) / 1_000_000
+        return mb >= 1 ? String(format: "%.1f MB/s", mb) : String(format: "%.0f KB/s", Double(bps) / 1000)
+    }
+
+    private nonisolated static func formatDuration(_ s: Int) -> String {
+        if s >= 3600 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+        if s >= 60 { return "\(s / 60)m" }
+        return "\(s)s"
+    }
+}

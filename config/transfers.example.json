@@ -1,0 +1,13 @@
+{
+  "pollSeconds": 60,
+  "sources": [
+    {
+      "label": "this Mac",
+      "command": ["your-transfer-cli", "queue", "--status", "--json"]
+    },
+    {
+      "label": "remote-host",
+      "command": ["ssh", "your-host", "nice", "-n", "19", "your-transfer-cli", "queue", "--status", "--json"]
+    }
+  ]
+}

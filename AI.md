@@ -4,11 +4,12 @@
 
 ## Optional panels
 
-The app ships two optional, machine-specific menu-bar panels: a read-only **VPN**
-protection-status row and a **Worker** start/stop control. Their behavior is
-generic; all machine-specific values load from untracked local config — see
-[CONFIG.md](./CONFIG.md) and [ROADMAP.md](./ROADMAP.md). Detailed integration
-notes are kept in an untracked local doc, not in this repo.
+The app ships three optional, machine-specific menu-bar panels: a read-only **VPN**
+protection-status row, a **Worker** start/stop control, and a read-only **Transfers**
+panel (active file transfers — %, rate, ETA — from a queue CLI's JSON, across one or
+more machines). Their behavior is generic; all machine-specific values load from
+untracked local config — see [CONFIG.md](./CONFIG.md) and [ROADMAP.md](./ROADMAP.md).
+Detailed integration notes are kept in an untracked local doc, not in this repo.
 
 **Guardrail:** never hard-code host paths, vendor/product names, or fleet
 specifics into tracked source — they belong in `~/.config/server-monitor/` or

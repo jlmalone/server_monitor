@@ -1,0 +1,57 @@
+# Dependencies
+cli/node_modules/
+node_modules/
+
+# Logs (keep directory, ignore contents)
+logs/*.log
+logs/*.error.log
+
+# User-specific configuration (generated per-machine)
+services.json
+launchd/
+config/services.json
+
+# Build outputs
+build/
+dist/
+*.app
+*.dmg
+DerivedData/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Xcode
+app/ServerMonitor/ServerMonitor.xcodeproj/project.xcworkspace/
+app/ServerMonitor/ServerMonitor.xcodeproj/xcuserdata/
+app/ServerMonitor/DerivedData/
+app/ServerMonitor/build/
+*.xcuserstate
+
+# IDE
+.idea/
+.vscode/
+
+# Config backups
+config/*.bak
+*.backup
+
+# npm
+# package-lock.json
+
+# Credentials and secrets
+scripts/.env
+.env
+*.p12
+*.p8
+
+# Private / machine-specific (untracked; synced out-of-band across machines, NOT via git)
+*.local
+*.local.*
+*.local.md
+config/worker.json
+
+# Backup/archive folders
+launchd_bak_todo/

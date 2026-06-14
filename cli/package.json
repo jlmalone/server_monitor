@@ -1,0 +1,50 @@
+{
+  "name": "@salient/server-monitor",
+  "version": "1.0.0",
+  "description": "CLI tool for managing macOS dev servers via launchd",
+  "keywords": [
+    "macos",
+    "launchd",
+    "server",
+    "monitoring",
+    "cli",
+    "dev-tools"
+  ],
+  "author": "jlmalone",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jlmalone/server_monitor.git"
+  },
+  "bin": {
+    "sm": "./bin/sm"
+  },
+  "type": "module",
+  "main": "./src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "pkg": "^5.8.1"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "test:ci": "CI=true node --test test/**/*.test.js",
+    "test:watch": "node --test --watch test/**/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/**/*.test.js",
+    "lint": "eslint src/",
+    "link": "npm link",
+    "unlink": "npm unlink -g @salient/server-monitor"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ]
+}

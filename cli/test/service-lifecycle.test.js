@@ -20,14 +20,22 @@ const __dirname = dirname(__filename);
  */
 
 describe('Service Lifecycle', () => {
-  const isCI = process.env.CI === 'true';
+  // Tests that load real launchd agents mutate the live user domain, so they are
+  // opt-in (SM_LIVE_TESTS=1) and skip by default — `npm test` stays green on any
+  // machine / CI.
+  const liveTests = process.env.SM_LIVE_TESTS === '1';
   let testServiceName;
   let testServicePath;
-  
+  let testConfigPath;
+
   beforeEach(() => {
     testServiceName = `test-lifecycle-${randomBytes(4).toString('hex')}`;
     testServicePath = join(tmpdir(), testServiceName);
     mkdirSync(testServicePath, { recursive: true });
+    // Hermetic: every spawned `sm` subprocess inherits this throwaway config path
+    // via process.env, so tests never read or write the repo's real services.json.
+    testConfigPath = join(tmpdir(), `${testServiceName}-services.json`);
+    process.env.SERVERMONITOR_CONFIG = testConfigPath;
   });
   
   afterEach(async () => {
@@ -42,6 +50,10 @@ describe('Service Lifecycle', () => {
     if (existsSync(testServicePath)) {
       rmSync(testServicePath, { recursive: true, force: true });
     }
+    if (testConfigPath && existsSync(testConfigPath)) {
+      rmSync(testConfigPath, { force: true });
+    }
+    delete process.env.SERVERMONITOR_CONFIG;
   });
 
   describe('add command', () => {
@@ -159,7 +171,7 @@ describe('Service Lifecycle', () => {
 
   describe('start command', function() {
     it('generates plist and starts service', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -212,7 +224,7 @@ describe('Service Lifecycle', () => {
     });
 
     it('reports already running service', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -253,7 +265,7 @@ describe('Service Lifecycle', () => {
 
   describe('stop command', function() {
     it('uses bootout to truly stop service', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -305,7 +317,7 @@ describe('Service Lifecycle', () => {
     });
 
     it('handles already stopped service gracefully', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -343,7 +355,7 @@ describe('Service Lifecycle', () => {
 
   describe('restart command', function() {
     it('regenerates plist on restart', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -386,7 +398,7 @@ describe('Service Lifecycle', () => {
 
   describe('remove command', function() {
     it('cleans up JSON config and plist', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -433,7 +445,7 @@ describe('Service Lifecycle', () => {
     });
 
     it('supports --keep-config option', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }
@@ -475,7 +487,7 @@ describe('Service Lifecycle', () => {
 
   describe('full lifecycle integration', function() {
     it('add -> start -> stop -> remove cycle', async function() {
-      if (isCI) {
+      if (!liveTests) {
         this.skip();
         return;
       }

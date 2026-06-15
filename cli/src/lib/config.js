@@ -7,6 +7,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..', '..');
 const CONFIG_PATH = join(PROJECT_ROOT, 'services.json');
 
+// Resolve the active config path at call time so tests and power users can
+// override it via SERVERMONITOR_CONFIG without touching the repo's services.json.
+function activeConfigPath() {
+  return process.env.SERVERMONITOR_CONFIG || CONFIG_PATH;
+}
+
 const DEFAULT_CONFIG = {
   version: '2.0.0',
   settings: {
@@ -26,11 +32,12 @@ const APP_SUPPORT_CONFIG = join(homedir(), 'Library', 'Application Support', 'Se
  * Load the services configuration
  */
 export function loadConfig() {
-  // Priority: 1. Current Directory (already set as CONFIG_PATH) 2. Application Support
-  let configPath = CONFIG_PATH;
+  // Priority: 1. SERVERMONITOR_CONFIG / project services.json  2. Application Support
+  const primary = activeConfigPath();
+  let configPath = primary;
 
   // If local config doesn't exist but global does, use global
-  if (!existsSync(CONFIG_PATH) && existsSync(APP_SUPPORT_CONFIG)) {
+  if (!existsSync(primary) && existsSync(APP_SUPPORT_CONFIG)) {
     configPath = APP_SUPPORT_CONFIG;
   }
 
@@ -40,7 +47,7 @@ export function loadConfig() {
   }
 
   try {
-    const content = readFileSync(CONFIG_PATH, 'utf-8');
+    const content = readFileSync(configPath, 'utf-8');
     const config = JSON.parse(content);
     // Merge with defaults for any missing settings
     return {
@@ -58,7 +65,7 @@ export function loadConfig() {
  * Save the configuration
  */
 export function saveConfig(config) {
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  writeFileSync(activeConfigPath(), JSON.stringify(config, null, 2));
 }
 
 /**

@@ -54,6 +54,7 @@ Schema (`config/transfers.example.json`):
 | `pollSeconds` | optional poll interval (default 60) |
 | `sources[].label` | machine label shown on each transfer row |
 | `sources[].command` | argv that prints the queue JSON (run via a login shell); for a remote machine prefix with `ssh <host> nice -n 19 …` |
+| `sources[].runCommand` | optional argv that reprocesses failed/pending transfers; when set, failed rows show a one-click **Resume** that runs it detached (survives the menu closing). Omit to keep the source read-only. |
 
 The command must print JSON shaped like
 `{ "queue": [ { "id","source","dest","status","mode","bytesTransferred","bytesTotal","filesDone","filesTotal","rateBytesPerSec","currentFile" } ], "summary": { "running","pending","failed" } }`

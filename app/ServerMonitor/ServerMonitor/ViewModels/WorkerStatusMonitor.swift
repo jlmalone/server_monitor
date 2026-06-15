@@ -126,9 +126,11 @@ final class WorkerStatusMonitor: ObservableObject {
 // JSON, and computes %/ETA for display — no host names or tool specifics here.
 
 struct TransfersSource: Codable {
-    var label: String      // machine label shown on each row, e.g. "this Mac"
-    var command: [String]  // argv that prints the queue JSON (run via a login shell);
-                           // remote example: ["ssh","<host>","nice","-n","19", ...]
+    var label: String          // machine label shown on each row, e.g. "this Mac"
+    var command: [String]      // argv that prints the queue JSON (run via a login shell);
+                               // remote example: ["ssh","<host>","nice","-n","19", ...]
+    var runCommand: [String]?  // optional argv that reprocesses failed/pending transfers
+                               // for this source; when set, failed rows get a Resume button.
 }
 
 struct TransfersConfig: Codable {
@@ -248,6 +250,36 @@ final class TransfersMonitor: ObservableObject {
                 self.lastError = fe
             }
         }
+    }
+
+    /// True when `machine` has a `runCommand` configured — i.e. its failed rows
+    /// can offer a Resume button. Sources without one stay read-only.
+    func canResume(machine: String) -> Bool {
+        guard let run = config?.sources.first(where: { $0.label == machine })?.runCommand else { return false }
+        return !run.isEmpty
+    }
+
+    /// Kick off the source's `runCommand` (e.g. reprocess failed/pending) detached,
+    /// so it keeps running after the menu closes, then refresh shortly after to
+    /// reflect the new state. No-op if the source has no `runCommand`.
+    func resume(machine: String) {
+        guard let run = config?.sources.first(where: { $0.label == machine })?.runCommand, !run.isEmpty else { return }
+        Self.runDetached(run)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.refresh() }
+    }
+
+    private nonisolated static func runDetached(_ argv: [String]) {
+        guard !argv.isEmpty else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        // Background + nohup so the transfer outlives the menu/app; argv passed
+        // POSITIONALLY so nothing is interpolated into a shell string (no injection).
+        p.arguments = ["-lc", "nohup \"$@\" >/dev/null 2>&1 &", "transfers"] + argv
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return }
+        // zsh returns immediately after backgrounding; reap it off the main thread.
+        Task.detached { p.waitUntilExit() }
     }
 
     private nonisolated static func runCommand(_ argv: [String]) -> Data? {

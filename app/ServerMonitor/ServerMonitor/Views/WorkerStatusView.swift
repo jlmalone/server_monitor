@@ -137,6 +137,12 @@ struct TransfersView: View {
                     Text(row.status).font(.caption2).foregroundColor(.secondary)
                 }
                 Spacer()
+                if row.status == "failed", monitor.canResume(machine: row.machine) {
+                    Button("Resume") { monitor.resume(machine: row.machine) }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .font(.caption2)
+                }
             }
         }
     }

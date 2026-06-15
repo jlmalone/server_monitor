@@ -3,11 +3,13 @@
   "sources": [
     {
       "label": "this Mac",
-      "command": ["your-transfer-cli", "queue", "--status", "--json"]
+      "command": ["your-transfer-cli", "queue", "--status", "--json"],
+      "runCommand": ["your-transfer-cli", "queue", "--run"]
     },
     {
       "label": "remote-host",
-      "command": ["ssh", "your-host", "nice", "-n", "19", "your-transfer-cli", "queue", "--status", "--json"]
+      "command": ["ssh", "your-host", "nice", "-n", "19", "your-transfer-cli", "queue", "--status", "--json"],
+      "runCommand": ["ssh", "your-host", "your-transfer-cli", "queue", "--run"]
     }
   ]
 }

@@ -1,0 +1,24 @@
+{
+  "_comment": "Optional Protection panel. Copy to ~/.config/server-monitor/protection.json and fill in your machine's real invariants. Each check runs an argv (via a login shell, positionally): exit 0 = OK, nonzero = AT RISK. An optional 'repair' argv re-arms a failing invariant when you click Repair. 'note' is an optional hint shown when the check fails. The app only runs the argv and reads exit codes — it stores no host names or tool specifics, so this real file is never committed.",
+  "pollSeconds": 10,
+  "checks": [
+    {
+      "id": "guard-agent",
+      "label": "Guard agent loaded",
+      "check": ["launchctl", "print", "gui/501/com.example.guard"],
+      "repair": ["launchctl", "bootstrap", "gui/501", "/Users/you/Library/LaunchAgents/com.example.guard.plist"]
+    },
+    {
+      "id": "status-fresh",
+      "label": "Status file fresh (<60s)",
+      "check": ["zsh", "-c", "test $(( $(date +%s) - $(stat -f %m /tmp/your-status.json) )) -lt 60"],
+      "repair": ["/Users/you/.local/bin/your-healthcheck", "--no-revert"]
+    },
+    {
+      "id": "control-path",
+      "label": "VPN control binary present",
+      "check": ["zsh", "-c", "test -x /Applications/YourVPN.app/Contents/MacOS/yourvpnctl"],
+      "note": "reinstall the VPN client if missing"
+    }
+  ]
+}

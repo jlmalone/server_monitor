@@ -3,7 +3,7 @@
 Server Monitor's core (the `sm` CLI + Services panel) needs no special setup —
 `services.json` is generated on first run.
 
-Two **optional** menu-bar panels are machine-specific and read their settings
+Several **optional** menu-bar panels are machine-specific and read their settings
 from **untracked** local files that are **never committed** to this repo:
 
 | Panel | What it shows | Local config |
@@ -11,6 +11,7 @@ from **untracked** local files that are **never committed** to this repo:
 | **VPN** | Read-only network-protection status from a local status file (`/tmp/darkmesh-status.json`) written by a separate helper on your machine. | none in this repo — the helper is configured separately |
 | **Worker** | Start/stop + throughput of a local background worker node. | `~/.config/server-monitor/worker.json` |
 | **Transfers** | Active file transfers (per item: %, rate, ETA) read from a queue CLI's JSON, across one or more machines. | `~/.config/server-monitor/transfers.json` |
+| **Protection** | Fail-closed integrity: one **OK / AT RISK** badge plus one-click **Repair**, from a list of check/repair commands you define. | `~/.config/server-monitor/protection.json` |
 
 ## Worker config
 
@@ -58,6 +59,33 @@ The command must print JSON shaped like
 `{ "queue": [ { "id","source","dest","status","mode","bytesTransferred","bytesTotal","filesDone","filesTotal","rateBytesPerSec","currentFile" } ], "summary": { "running","pending","failed" } }`
 — **raw byte counters**; the panel computes % and ETA itself. With no
 `transfers.json`, the Transfers panel is inert.
+
+## Protection config
+
+Continuously verify the machine's fail-closed invariants and re-arm them with one
+click. Each check is a shell command (argv); **exit 0 = OK, nonzero = AT RISK**.
+
+```bash
+cp config/protection.example.json ~/.config/server-monitor/protection.json
+$EDITOR ~/.config/server-monitor/protection.json
+```
+
+Schema (`config/protection.example.json`):
+
+| Key | Meaning |
+|-----|---------|
+| `pollSeconds` | optional poll interval (default 10) |
+| `checks[].id` | stable identifier for the invariant |
+| `checks[].label` | name shown in the panel |
+| `checks[].check` | argv run via a login shell; exit 0 = OK, nonzero = AT RISK |
+| `checks[].repair` | optional argv that re-arms the invariant when you click **Repair** |
+| `checks[].note` | optional hint shown when the check is failing (e.g. "needs admin") |
+
+The panel shows a single **Protection: OK / AT RISK** badge (distinct from the VPN
+verdict), lists any failing invariants, and offers a one-click **Repair** that runs
+the `repair` argv for each failing check. With no `protection.json`, the panel is
+inert. As with the others, the app only runs the configured argv and reads exit
+codes — no host names or tool specifics live in tracked source.
 
 ## Why these live outside git
 

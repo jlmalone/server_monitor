@@ -8,6 +8,7 @@ import SwiftUI
 /// the full status file in Finder for forensics.
 struct DarkmeshStatusView: View {
     @ObservedObject var monitor: DarkmeshStatusMonitor
+    @ObservedObject var protection: ProtectionMonitor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -27,6 +28,8 @@ struct DarkmeshStatusView: View {
                     .font(.caption2)
                     .foregroundColor(.red)
             }
+
+            integritySection
         }
         .padding(.horizontal)
         .padding(.vertical, 6)
@@ -102,9 +105,59 @@ struct DarkmeshStatusView: View {
             .padding(.top, 2)
         }
     }
+
+    /// Compact fail-closed integrity row: an OK / AT RISK badge (distinct from
+    /// the VPN verdict), the failing invariants, and a one-click Repair. Renders
+    /// nothing unless a protection.json is configured.
+    @ViewBuilder
+    private var integritySection: some View {
+        if protection.configured && protection.hasResults {
+            Divider().padding(.vertical, 2)
+            HStack(spacing: 8) {
+                Image(systemName: protection.atRisk ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
+                    .font(.caption)
+                    .foregroundColor(protection.badgeColor)
+                Text("Protection")
+                    .font(.caption)
+                    .frame(width: 78, alignment: .leading)
+                Text(protection.badgeText)
+                    .font(.caption2.bold())
+                    .foregroundColor(protection.badgeColor)
+                Spacer()
+                if protection.atRisk {
+                    if protection.repairing {
+                        Text("repairing…")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else if protection.failing.contains(where: { $0.repairable }) {
+                        Button(action: { protection.repair() }) {
+                            Label("Repair", systemImage: "wrench.and.screwdriver")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+            }
+            if protection.atRisk {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(protection.failing) { f in
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.red).frame(width: 5, height: 5)
+                            Text(f.note.map { "\(f.label) · \($0)" } ?? f.label)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.leading, 2)
+            }
+        }
+    }
 }
 
 #Preview {
-    DarkmeshStatusView(monitor: DarkmeshStatusMonitor(pollInterval: 60))
+    DarkmeshStatusView(monitor: DarkmeshStatusMonitor(pollInterval: 60),
+                       protection: ProtectionMonitor(pollInterval: 60))
         .frame(width: 320)
 }

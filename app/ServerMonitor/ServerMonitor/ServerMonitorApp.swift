@@ -6,6 +6,7 @@ struct ServerMonitorApp: App {
     @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @StateObject private var worker = WorkerStatusMonitor()
     @StateObject private var transfers = TransfersMonitor()
+    @StateObject private var protection = ProtectionMonitor()
     @Environment(\.openWindow) var openWindow
 
     /// Combined menu-bar tint. Green ONLY when darkmesh verdict is GO (VPN
@@ -15,6 +16,7 @@ struct ServerMonitorApp: App {
         if let v = darkmesh.status?.verdict, v == "NO-GO" { return .red }
         if monitor.overallStatus == .stopped                { return .red }
         if let v = darkmesh.status?.verdict, v == "DEGRADED" { return .yellow }
+        if protection.atRisk { return .yellow }   // a fail-closed guard is down — never show "all good"
         if darkmesh.status?.verdict == "GO" { return monitor.overallStatus.color }
         return .yellow   // no GO verdict (VPN off / IDLE / status missing): not protected
     }
@@ -22,7 +24,7 @@ struct ServerMonitorApp: App {
     var body: some Scene {
         MenuBarExtra {
             VStack(spacing: 0) {
-                DarkmeshStatusView(monitor: darkmesh)
+                DarkmeshStatusView(monitor: darkmesh, protection: protection)
                 Divider()
                 WorkerStatusView(monitor: worker)
                 Divider()

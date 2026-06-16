@@ -23,6 +23,7 @@ struct DarkmeshStatus: Codable, Equatable {
     let desired: String?
     let servicesOk: Bool?
     let reconnect: Reconnect?
+    let pf: PFState?
 
     enum CodingKeys: String, CodingKey {
         case timestamp
@@ -38,6 +39,7 @@ struct DarkmeshStatus: Codable, Equatable {
         case desired
         case servicesOk              = "services_ok"
         case reconnect
+        case pf
     }
 
     /// Recovery snapshot authored by the reconnect watchdog and merged into the
@@ -62,8 +64,31 @@ struct DarkmeshStatus: Codable, Equatable {
         }
     }
 
+    /// PF kill-switch state authored by vpn-guard and merged into the status file
+    /// by the healthcheck (status schema 2+). `pfAnchorEvaluated` is the
+    /// "is the kill-switch actually wired" signal — false means loaded-but-dead.
+    struct PFState: Codable, Equatable {
+        let pfEnabled: Bool?
+        let pfAnchor: String?
+        let pfAnchorEvaluated: Bool?
+        let pfKillActive: Bool?
+        let checkedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case pfEnabled         = "pf_enabled"
+            case pfAnchor          = "pf_anchor"
+            case pfAnchorEvaluated = "pf_anchor_evaluated"
+            case pfKillActive      = "pf_kill_active"
+            case checkedAt         = "checked_at"
+        }
+    }
+
     /// False only when the status explicitly reports a keep-alive service down.
     var servicesHealthy: Bool { servicesOk ?? true }
+
+    /// True only when the PF kill-switch is confirmed wired (anchor evaluated).
+    /// nil when the status file predates the PF field (tolerate-or-warn).
+    var pfKillSwitchWired: Bool? { pf?.pfAnchorEvaluated }
 
     /// Color cue for the menu-bar status row.
     var verdictColor: Color {

@@ -18,6 +18,13 @@ Possible follow-ups (kept generic):
   user-provided control binary whose path comes from local config.
 - A "protection integrity" badge that flags when an expected guard agent isn't
   loaded, with a one-click re-arm.
+- **Cannibalise + retire the darkmesh SwiftBar plugin** (lockstep with
+  `darkmesh-vpn-guard/ROADMAP.md`): port the plugin's actions — Disconnect VPN, Run
+  healthcheck now, Emergency restore internet, Open the VPN client + Tailscale apps,
+  Reveal status JSON — into this panel, and surface the status-schema-2 fields (`desired`,
+  `services_ok`, the `reconnect` recovery snapshot; already decoded in
+  `DarkmeshStatus.swift`). Each action just shells a documented helper — the app
+  never owns network policy. Once at parity, the SwiftBar plugin is deleted there.
 
 ## Worker panel (start/stop)
 

@@ -17,6 +17,13 @@ struct DarkmeshStatus: Codable, Equatable {
     let autoDisconnectReason: String
     let autoDisconnectAt: String
 
+    // Added in status schema 2. Optional so older status files decode to nil and
+    // a missing field never breaks the panel (tolerate-or-warn).
+    let schema: Int?
+    let desired: String?
+    let servicesOk: Bool?
+    let reconnect: Reconnect?
+
     enum CodingKeys: String, CodingKey {
         case timestamp
         case vpnState                = "vpn_state"
@@ -27,7 +34,36 @@ struct DarkmeshStatus: Codable, Equatable {
         case autoDisconnected        = "auto_disconnected"
         case autoDisconnectReason    = "auto_disconnect_reason"
         case autoDisconnectAt        = "auto_disconnect_at"
+        case schema
+        case desired
+        case servicesOk              = "services_ok"
+        case reconnect
     }
+
+    /// Recovery snapshot authored by the reconnect watchdog and merged into the
+    /// status file by the healthcheck (status schema 2+).
+    struct Reconnect: Codable, Equatable {
+        let phase: String?
+        let vpnState: String?
+        let consecutiveFails: Int?
+        let appRestarts: Int?
+        let gaveUp: Bool?
+        let tunnelIp: String?
+        let updatedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case phase
+            case vpnState         = "vpn_state"
+            case consecutiveFails = "consecutive_fails"
+            case appRestarts      = "app_restarts"
+            case gaveUp           = "gave_up"
+            case tunnelIp         = "tunnel_ip"
+            case updatedAt        = "updated_at"
+        }
+    }
+
+    /// False only when the status explicitly reports a keep-alive service down.
+    var servicesHealthy: Bool { servicesOk ?? true }
 
     /// Color cue for the menu-bar status row.
     var verdictColor: Color {

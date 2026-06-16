@@ -1,24 +1,32 @@
 {
-  "_comment": "Optional Protection panel. Copy to ~/.config/server-monitor/protection.json and fill in your machine's real invariants. Each check runs an argv (via a login shell, positionally): exit 0 = OK, nonzero = AT RISK. An optional 'repair' argv re-arms a failing invariant when you click Repair. 'note' is an optional hint shown when the check fails. The app only runs the argv and reads exit codes — it stores no host names or tool specifics, so this real file is never committed.",
+  "_comment": "Optional Protection panel. Copy to ~/.config/server-monitor/protection.json and fill in your machine's real invariants. Each check runs an argv (login shell, positional args): exit 0 = OK, nonzero = AT RISK. Optional 'repair' argv re-arms a failing invariant on Repair. 'note' is a hint shown on failure. The app stores no host names or tool specifics, so the real file is never committed. DEPTH MATTERS: a 'launchctl print' check only proves a job is LOADED — for a watchdog loop also assert it is RUNNING (has a pid) and its status output is FRESH; a loaded-but-dead loop is the silent failure. For a whole stack prefer ONE composite audit command (nonzero if anything is missing/stale), e.g. darkmesh's 'darkmesh-audit'.",
   "pollSeconds": 10,
   "checks": [
     {
-      "id": "guard-agent",
-      "label": "Guard agent loaded",
-      "check": ["launchctl", "print", "gui/501/com.example.guard"],
-      "repair": ["launchctl", "bootstrap", "gui/501", "/Users/you/Library/LaunchAgents/com.example.guard.plist"]
+      "id": "stack-audit",
+      "label": "Network-guard stack healthy",
+      "check": ["your-stack-audit"],
+      "repair": ["your-stack-install"],
+      "note": "one composite check: every keep-alive agent loaded+running+fresh"
+    },
+    {
+      "id": "agent-running",
+      "label": "Guard agent loaded AND running",
+      "check": ["zsh", "-c", "launchctl print gui/501/com.example.guard 2>/dev/null | grep -qE 'state = running|pid = [0-9]+'"],
+      "repair": ["launchctl", "kickstart", "-k", "gui/501/com.example.guard"]
+    },
+    {
+      "id": "binding-current",
+      "label": "Transfer client bound to the live tunnel",
+      "check": ["your-vpn-doctor", "--check"],
+      "repair": ["your-vpn-doctor", "--fix", "--quit", "--relaunch"],
+      "note": "exit 3 = stale binding (fail-closed, not a leak)"
     },
     {
       "id": "status-fresh",
       "label": "Status file fresh (<60s)",
       "check": ["zsh", "-c", "test $(( $(date +%s) - $(stat -f %m /tmp/your-status.json) )) -lt 60"],
       "repair": ["/Users/you/.local/bin/your-healthcheck", "--no-revert"]
-    },
-    {
-      "id": "control-path",
-      "label": "VPN control binary present",
-      "check": ["zsh", "-c", "test -x /Applications/YourVPN.app/Contents/MacOS/yourvpnctl"],
-      "note": "reinstall the VPN client if missing"
     }
   ]
 }

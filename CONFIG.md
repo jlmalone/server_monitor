@@ -88,6 +88,15 @@ the `repair` argv for each failing check. With no `protection.json`, the panel i
 inert. As with the others, the app only runs the configured argv and reads exit
 codes — no host names or tool specifics live in tracked source.
 
+**Check depth matters.** `launchctl print …` only proves an agent is *loaded*. For
+a watchdog loop, also assert it is *running* (has a pid) and its status output is
+*fresh* — a loaded-but-dead loop is the silent failure mode. The simplest robust
+approach is one **composite audit** command that returns nonzero if anything in the
+stack is missing/stale (e.g. darkmesh's `darkmesh-audit`), plus a binding check
+(`transfer-vpn-doctor --check`: exit `3` = stale). A failing check turns the
+menu-bar dot **off green** via the existing combined tint — so "green requires every
+keep-alive service running" needs no app code, just these checks.
+
 ## Why these live outside git
 
 These files carry **per-machine paths and operational specifics** that are

@@ -31,6 +31,18 @@ struct ServerMonitorApp: App {
                 WorkerStatusView(monitor: worker)
                 Divider()
                 TransfersView(monitor: transfers)
+                HStack {
+                    Spacer()
+                    Button {
+                        openWindow(id: "transfer-history")
+                    } label: {
+                        Label("Transfer History…", systemImage: "clock.arrow.circlepath")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
                 Divider()
                 MenuBarView(monitor: monitor)
 
@@ -67,5 +79,10 @@ struct ServerMonitorApp: App {
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 500, height: 400)
+
+        WindowGroup("Transfer History", id: "transfer-history") {
+            TransferHistoryWindow()
+        }
+        .defaultSize(width: 840, height: 560)
     }
 }

@@ -11,5 +11,8 @@
       "command": ["ssh", "your-host", "nice", "-n", "19", "your-transfer-cli", "queue", "--status", "--json"],
       "runCommand": ["ssh", "your-host", "your-transfer-cli", "queue", "--run"]
     }
-  ]
+  ],
+  "history": {
+    "command": ["your-transfer-cli", "history", "--json"]
+  }
 }

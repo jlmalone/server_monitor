@@ -55,11 +55,21 @@ Schema (`config/transfers.example.json`):
 | `sources[].label` | machine label shown on each transfer row |
 | `sources[].command` | argv that prints the queue JSON (run via a login shell); for a remote machine prefix with `ssh <host> nice -n 19 …` |
 | `sources[].runCommand` | optional argv that reprocesses failed/pending transfers; when set, failed rows show a one-click **Resume** that runs it detached (survives the menu closing). Omit to keep the source read-only. |
+| `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **Transfer History** window (opened from the dropdown). Omit to leave that window unconfigured. |
 
 The command must print JSON shaped like
 `{ "queue": [ { "id","source","dest","status","mode","bytesTransferred","bytesTotal","filesDone","filesTotal","rateBytesPerSec","currentFile" } ], "summary": { "running","pending","failed" } }`
 — **raw byte counters**; the panel computes % and ETA itself. With no
 `transfers.json`, the Transfers panel is inert.
+
+The **Transfer History** window reads `history.command`, which must print **one
+JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",
+"targetMachine","startTime","endTime","status","filesTransferred","bytesTransferred","errors" }`.
+Only `id`/`startTime`/`status` are required; the rest degrade gracefully. The
+window is searchable, status-filterable (defaults to **Failed** for triage) and
+newest-first, with click-to-drill detail. It also carries **Inventory** and
+**Reclaim** tabs that activate once the tool exposes those as JSON (Reclaim is
+read-only / dry-run only — the app never deletes).
 
 ## Protection config
 

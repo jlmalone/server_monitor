@@ -133,9 +133,19 @@ struct TransfersSource: Codable {
                                // for this source; when set, failed rows get a Resume button.
 }
 
+/// Optional reader for the transfer tool's JSON-lines history log, surfaced in
+/// the Transfer History window (distinct from the live queue above). `command`
+/// is argv that prints one record per line (run via a login shell); it lives
+/// under the optional "history" key in transfers.json. With it absent the
+/// window says "not configured" — no host names or tool specifics in this repo.
+struct TransfersHistorySource: Codable {
+    var command: [String]
+}
+
 struct TransfersConfig: Codable {
     var sources: [TransfersSource]
     var pollSeconds: Double?
+    var history: TransfersHistorySource?
 
     static func load() -> TransfersConfig? {
         let path = (NSHomeDirectory() as NSString)
@@ -321,5 +331,121 @@ final class TransfersMonitor: ObservableObject {
         if s >= 3600 { return "\(s / 3600)h \((s % 3600) / 60)m" }
         if s >= 60 { return "\(s / 60)m" }
         return "\(s)s"
+    }
+}
+
+// MARK: - Transfer History (secondary window)
+//
+// Browse the transfer tool's PAST operations from its JSON-lines history log —
+// distinct from the live queue above. Useful for spotting failure spikes and
+// drilling into a single run. WHAT emits the log is machine-specific and lives
+// in untracked transfers.json under the optional "history" key (one JSON object
+// per line). This open-source code only runs the configured command and decodes
+// generic fields; no host names or tool specifics live here.
+
+/// One past transfer operation, decoded from a single line of the history log.
+/// Everything past `id`/`startTime`/`status` is optional so a schema drift or an
+/// incomplete (e.g. cancelled) record degrades one cell rather than dropping the
+/// whole row.
+struct TransferHistoryRecord: Codable, Identifiable {
+    let id: String
+    let repositories: [String]?
+    let sourceMachine: String?
+    let targetMachine: String?
+    let startTime: String
+    let endTime: String?
+    let status: String
+    let filesTransferred: Int?
+    let bytesTransferred: Int64?
+    let errors: Int?
+}
+
+/// Loads + decodes the history log on demand (it is browsed, not watched, so no
+/// polling timer — just an explicit Refresh). Decode + sort happen off the main
+/// thread because the log can be tens of thousands of lines.
+@MainActor
+final class TransferHistoryLoader: ObservableObject {
+    @Published private(set) var records: [TransferHistoryRecord] = []
+    @Published private(set) var loading = false
+    @Published private(set) var error: String?
+    let configured: Bool
+
+    private let command: [String]?
+
+    init() {
+        self.command = TransfersConfig.load()?.history?.command
+        self.configured = (command?.isEmpty == false)
+    }
+
+    func reload() {
+        guard let cmd = command, !cmd.isEmpty else { return }
+        loading = true
+        error = nil
+        Task.detached {
+            let result = Self.loadRecords(cmd)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.loading = false
+                self.records = result.records
+                if let e = result.error {
+                    self.error = e
+                } else {
+                    self.error = result.records.isEmpty ? "no history records" : nil
+                }
+            }
+        }
+    }
+
+    private nonisolated static func loadRecords(_ argv: [String]) -> (records: [TransferHistoryRecord], error: String?) {
+        guard let data = runArgv(argv) else { return ([], "history command failed to run") }
+        guard let text = String(data: data, encoding: .utf8) else { return ([], "history output was not UTF-8") }
+        let dec = JSONDecoder()
+        var out: [TransferHistoryRecord] = []
+        out.reserveCapacity(4096)
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            // tolerate junk/partial lines — skip what doesn't decode rather than failing the load
+            guard let rec = try? dec.decode(TransferHistoryRecord.self, from: Data(line.utf8)) else { continue }
+            out.append(rec)
+        }
+        // newest first; parse each timestamp once (decorate-sort), unparseable sink to the bottom
+        let sorted = out
+            .map { (rec: $0, t: TransferHistoryDates.parse($0.startTime) ?? .distantPast) }
+            .sorted { $0.t > $1.t }
+            .map { $0.rec }
+        return (sorted, nil)
+    }
+
+    /// Run argv POSITIONALLY via a login shell (user PATH) — nothing is
+    /// interpolated into the shell string, so config values can't inject.
+    private nonisolated static func runArgv(_ argv: [String]) -> Data? {
+        guard !argv.isEmpty else { return nil }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        p.arguments = ["-lc", "exec \"$@\"", "history"] + argv
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return data
+    }
+}
+
+/// ISO8601 parsing that tolerates any sub-second precision. The log writes
+/// microseconds (e.g. `…55.705754Z`), which `ISO8601DateFormatter`'s fractional
+/// mode rejects, so we strip the fractional part and parse to whole seconds —
+/// ample for display + sort.
+enum TransferHistoryDates {
+    private static let fmt: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    static func parse(_ s: String?) -> Date? {
+        guard let s else { return nil }
+        let cleaned = s.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        return fmt.date(from: cleaned)
     }
 }

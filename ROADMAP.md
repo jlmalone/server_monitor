@@ -55,16 +55,18 @@ from a queue CLI's `--json` output named in untracked
 when a reprocess command is configured. Raw byte counters in; the panel derives
 %/ETA.
 
-## Transfer History + Inventory + Reclaim window — planned
+## Transfer History + Inventory + Reclaim window — History shipped
 
 A secondary **window** (opened from the dropdown) for the file-transfer tool's
 records — distinct from the live queue:
 
-- **History** *(buildable now)*: browse past sync operations from the tool's history
+- **History** *(shipped)*: browse past sync operations from the tool's history
   log (timestamp, repositories, route, status, files, bytes, errors), newest first,
-  with search + status filter and click-to-drill-in detail (duration, average rate,
-  raw fields). Reads a JSON-lines history log via untracked config — same generic
-  pattern as the other panels. Useful immediately for spotting failure spikes.
+  with search + status filter (defaults to **Failed** for triage) and click-to-drill
+  detail (duration, average rate, raw fields). Reads a JSON-lines history log via the
+  untracked `history` key in `transfers.json` — same generic pattern as the other
+  panels. Opened from the "Transfer History…" link under the Transfers panel; useful
+  immediately for spotting failure spikes.
 - **Inventory** *(when the tool exposes it as JSON)*: for each title, which machines
   hold it and whether a verified copy exists elsewhere.
 - **Reclaim** *(when the tool exposes it as JSON)*: what's safely reclaimable locally

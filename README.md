@@ -19,13 +19,25 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 
 ## 🚀 Installation
 
-### Option 1: Download DMG (Recommended)
+### Option 1: Homebrew (Recommended)
+
+```bash
+brew install --cask jlmalone/tap/server-monitor
+```
+
+Installs **ServerMonitor.app** into `/Applications` (double-click to launch). The
+app is not yet notarized, so the first launch needs a one-time Gatekeeper
+approval: right-click the app → **Open** → **Open** (or run
+`xattr -dr com.apple.quarantine "/Applications/ServerMonitor.app"`). Update later
+with `brew upgrade --cask server-monitor`.
+
+### Option 2: Download DMG
 
 1. Download the latest `ServerMonitor-x.x.x.dmg` from [GitHub Releases](https://github.com/jlmalone/server_monitor/releases)
 2. Open the DMG and drag **Server Monitor** to Applications
 3. Launch Server Monitor from Applications
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 ```bash
 git clone https://github.com/jlmalone/server_monitor.git

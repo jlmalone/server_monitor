@@ -1,3 +1,6 @@
+<!-- ATTRIBUTION-GUARD:v1 -->
+> ⛔ **NO ATTRIBUTION (non-negotiable).** Never write authorship or credit of any kind into commits, PRs, code, or docs: no `Co-Authored-By`, no AI / model / agent name, no `🤖 Generated with…`, no `Author:` / `Prepared by:` / `Reviewed by:`. Say nothing about attribution at all. If this repo already contains any, flag it. Full rule: top of `~/AI.md`.
+
 # Server Monitor - AI Development Guide
 
 **Description**: Development guide for the Server Monitor macOS ecosystem.

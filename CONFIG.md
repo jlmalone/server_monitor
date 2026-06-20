@@ -56,6 +56,11 @@ Schema (`config/transfers.example.json`):
 | `sources[].command` | argv that prints the queue JSON (run via a login shell); for a remote machine prefix with `ssh <host> nice -n 19 …` |
 | `sources[].runCommand` | optional argv that reprocesses failed/pending transfers; when set, failed rows show a one-click **Resume** that runs it detached (survives the menu closing). Omit to keep the source read-only. |
 | `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **Transfer History** window (opened from the dropdown). Omit to leave that window unconfigured. |
+| `transfer.machines` | optional list of machine labels shown as drop targets in the **Transfer** tab; if omitted, derived from the machines seen in history |
+| `transfer.copyCommand` | argv that copies a title to a machine, with `{title}`/`{src}`/`{dst}` placeholders the app fills in (substituted per-element, never into a shell string). Enables the Transfer tab's **Copy** action |
+| `transfer.moveCommand` | optional argv (same placeholders) for a destructive **Move** (copy then delete the source). The Move button stays disabled until this is set |
+| `transfer.describeCommand` | optional argv (same placeholders) printing `{"files":N,"folders":M}` so the confirm dialog shows an exact "X files and Y folders"; omitted → it uses the file count + size from the dragged history row |
+| `transfer.logDir` | optional directory for per-operation logs (default `~/.config/server-monitor/transfer-logs`) |
 
 The command must print JSON shaped like
 `{ "queue": [ { "id","source","dest","status","mode","bytesTransferred","bytesTotal","filesDone","filesTotal","rateBytesPerSec","currentFile" } ], "summary": { "running","pending","failed" } }`
@@ -70,6 +75,16 @@ window is searchable, status-filterable (defaults to **Failed** for triage) and
 newest-first, with click-to-drill detail. It also carries **Inventory** and
 **Reclaim** tabs that activate once the tool exposes those as JSON (Reclaim is
 read-only / dry-run only — the app never deletes).
+
+With a `transfer` block configured, the window also gains a **Transfer** tab and a
+**Logs** tab. In Transfer, drag a title onto a machine chip; a confirm dialog shows
+the title, the `src → dst` route, and how much is moving (file count + size from the
+dragged history row, or an exact files/folders breakdown when `describeCommand` is
+set), with **Copy**, **Move** (only if `moveCommand` is set), and **Cancel**. Each
+launched transfer streams its combined output to a per-operation log under
+`transfer.logDir`; the **Logs** tab live-tails the selected operation so you can
+watch the low-level work and inspect failures. The app only ever runs the argv you
+configure — no host names or tool specifics live in this repo.
 
 ## Protection config
 

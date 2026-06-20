@@ -14,5 +14,12 @@
   ],
   "history": {
     "command": ["your-transfer-cli", "history", "--json"]
+  },
+  "transfer": {
+    "machines": ["this-mac", "desktop", "nas"],
+    "logDir": "~/.config/server-monitor/transfer-logs",
+    "copyCommand": ["your-transfer-cli", "send", "{title}", "{dst}:/inbox/", "--queue"],
+    "moveCommand": ["your-transfer-cli", "send", "{title}", "{dst}:/inbox/", "--move", "--queue"],
+    "describeCommand": ["your-transfer-cli", "describe", "{title}", "--machine", "{src}", "--json"]
   }
 }

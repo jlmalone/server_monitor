@@ -20,6 +20,8 @@
 		011 /* WorkerStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111; };
 		012 /* LidSleepMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112; };
 		013 /* LidSleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113; };
+		014 /* TransferActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114; };
+		015 /* TransferBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +39,8 @@
 		111 /* WorkerStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerStatusView.swift; sourceTree = "<group>"; };
 		112 /* LidSleepMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidSleepMonitor.swift; sourceTree = "<group>"; };
 		113 /* LidSleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidSleepView.swift; sourceTree = "<group>"; };
+		114 /* TransferActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferActions.swift; sourceTree = "<group>"; };
+		115 /* TransferBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferBoardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +97,7 @@
 				108 /* DarkmeshStatusMonitor.swift */,
 				110 /* WorkerStatusMonitor.swift */,
 				112 /* LidSleepMonitor.swift */,
+				114 /* TransferActions.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -106,6 +111,7 @@
 				109 /* DarkmeshStatusView.swift */,
 				111 /* WorkerStatusView.swift */,
 				113 /* LidSleepView.swift */,
+				115 /* TransferBoardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -180,6 +186,8 @@
 				011 /* WorkerStatusView.swift in Sources */,
 				012 /* LidSleepMonitor.swift in Sources */,
 				013 /* LidSleepView.swift in Sources */,
+				014 /* TransferActions.swift in Sources */,
+				015 /* TransferBoardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

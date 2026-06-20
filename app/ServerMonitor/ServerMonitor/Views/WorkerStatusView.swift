@@ -168,10 +168,18 @@ struct TransfersView: View {
 /// the tool exposes them as JSON (roadmap "Transfer History + Inventory + Reclaim
 /// window"). Reclaim is read-only/dry-run only by design — this window never deletes.
 struct TransferHistoryWindow: View {
+    @StateObject private var actions = TransferActionsModel()
+
     var body: some View {
         TabView {
             TransferHistoryTab()
                 .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+
+            TransferBoardView(actions: actions)
+                .tabItem { Label("Transfer", systemImage: "arrow.left.arrow.right") }
+
+            TransferLogsView(actions: actions)
+                .tabItem { Label("Logs", systemImage: "doc.text.magnifyingglass") }
 
             TransferToolStubTab(
                 title: "Inventory",

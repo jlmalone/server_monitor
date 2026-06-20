@@ -55,7 +55,7 @@ from a queue CLI's `--json` output named in untracked
 when a reprocess command is configured. Raw byte counters in; the panel derives
 %/ETA.
 
-## Transfer History + Inventory + Reclaim window — History shipped
+## Transfer History + Transfer + Logs + Inventory + Reclaim window — History/Transfer/Logs shipped
 
 A secondary **window** (opened from the dropdown) for the file-transfer tool's
 records — distinct from the live queue:
@@ -67,6 +67,15 @@ records — distinct from the live queue:
   untracked `history` key in `transfers.json` — same generic pattern as the other
   panels. Opened from the "Transfer History…" link under the Transfers panel; useful
   immediately for spotting failure spikes.
+- **Transfer** *(shipped)*: drag a title onto a machine chip to copy or move it
+  there. A confirm dialog shows the title, the `src → dst` route, and how much is
+  moving (file count + size from the dragged row, or an exact files/folders breakdown
+  when `describeCommand` is set), with **Copy** / **Move** / **Cancel** (Move only when
+  a `moveCommand` is configured). Driven by the untracked `transfer` block — the app
+  only runs the configured argv with `{title}`/`{src}`/`{dst}` filled in.
+- **Logs** *(shipped)*: every launched transfer streams its combined output to a
+  per-operation log; this tab live-tails the selected one so you can watch the
+  low-level work in real time and inspect failures.
 - **Inventory** *(when the tool exposes it as JSON)*: for each title, which machines
   hold it and whether a verified copy exists elsewhere.
 - **Reclaim** *(when the tool exposes it as JSON)*: what's safely reclaimable locally

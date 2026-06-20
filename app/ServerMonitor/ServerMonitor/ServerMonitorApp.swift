@@ -5,6 +5,7 @@ struct ServerMonitorApp: App {
     @StateObject private var monitor = ServiceMonitor()
     @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @StateObject private var worker = WorkerStatusMonitor()
+    @StateObject private var lidSleep = LidSleepMonitor()
     @StateObject private var transfers = TransfersMonitor()
     @StateObject private var protection = ProtectionMonitor()
     @Environment(\.openWindow) var openWindow
@@ -29,6 +30,10 @@ struct ServerMonitorApp: App {
                 DarkmeshStatusView(monitor: darkmesh, protection: protection)
                 Divider()
                 WorkerStatusView(monitor: worker)
+                if lidSleep.isLaptop {
+                    Divider()
+                    LidSleepView(monitor: lidSleep)
+                }
                 Divider()
                 TransfersView(monitor: transfers)
                 HStack {

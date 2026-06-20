@@ -18,6 +18,8 @@
 		009 /* DarkmeshStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109; };
 		010 /* WorkerStatusMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110; };
 		011 /* WorkerStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111; };
+		012 /* LidSleepMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112; };
+		013 /* LidSleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 		109 /* DarkmeshStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkmeshStatusView.swift; sourceTree = "<group>"; };
 		110 /* WorkerStatusMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerStatusMonitor.swift; sourceTree = "<group>"; };
 		111 /* WorkerStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerStatusView.swift; sourceTree = "<group>"; };
+		112 /* LidSleepMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidSleepMonitor.swift; sourceTree = "<group>"; };
+		113 /* LidSleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidSleepView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +92,7 @@
 				103 /* ServiceMonitor.swift */,
 				108 /* DarkmeshStatusMonitor.swift */,
 				110 /* WorkerStatusMonitor.swift */,
+				112 /* LidSleepMonitor.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -100,6 +105,7 @@
 				106 /* ServiceWizardView.swift */,
 				109 /* DarkmeshStatusView.swift */,
 				111 /* WorkerStatusView.swift */,
+				113 /* LidSleepView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -172,6 +178,8 @@
 				009 /* DarkmeshStatusView.swift in Sources */,
 				010 /* WorkerStatusMonitor.swift in Sources */,
 				011 /* WorkerStatusView.swift in Sources */,
+				012 /* LidSleepMonitor.swift in Sources */,
+				013 /* LidSleepView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

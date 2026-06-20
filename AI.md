@@ -13,6 +13,11 @@ downgrades the menu-bar tint off green. Their behavior is generic; all machine-s
 values load from untracked local config — see [CONFIG.md](./CONFIG.md) and [ROADMAP.md](./ROADMAP.md).
 Detailed integration notes are kept in an untracked local doc, not in this repo.
 
+A fourth panel, **Lid Close**, is fully generic and needs no config: on laptops it
+toggles `pmset disablesleep` so the Mac keeps running with the lid shut (read is
+unprivileged; the change goes through the native admin prompt — no helper daemon or
+sudoers entry). It hides itself on desktops (no battery).
+
 **Guardrail:** never hard-code host paths, vendor/product names, or fleet
 specifics into tracked source — they belong in `~/.config/server-monitor/` or
 other untracked, out-of-band-synced config.

@@ -16,6 +16,7 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 - **📝 Centralized Logs** - All service logs in one configurable location
 - **🚀 JSON-first Config** - Single source of truth in `services.json`
 - **🔒 Boot Persistence** - Services start automatically at login
+- **💡 Lid Close (laptops)** - One-click toggle to keep the Mac running with the lid shut (`pmset disablesleep`), so background services don't pause when you close it
 
 ## 🚀 Installation
 

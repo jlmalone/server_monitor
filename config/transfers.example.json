@@ -13,11 +13,14 @@
     }
   ],
   "history": {
-    "command": ["your-transfer-cli", "history", "--json"]
+    "command": ["your-transfer-cli", "history", "--json"],
+    "clearCommand": ["python3", "-c", "import json,sys,os,tempfile; p=sys.argv[1]; rows=[l for l in open(p) if l.strip() and json.loads(l).get('status')!='FAILED']; fd,t=tempfile.mkstemp(dir=os.path.dirname(p)); f=os.fdopen(fd,'w'); f.writelines(rows); f.close(); os.replace(t,p)", "/path/to/your/history.jsonl"]
   },
   "transfer": {
     "machines": ["this-mac", "desktop", "nas"],
     "logDir": "~/.config/server-monitor/transfer-logs",
+    "maxAttempts": 5,
+    "backoffBaseSeconds": 2,
     "copyCommand": ["your-transfer-cli", "send", "{title}", "{dst}:/inbox/", "--queue"],
     "moveCommand": ["your-transfer-cli", "send", "{title}", "{dst}:/inbox/", "--move", "--queue"],
     "describeCommand": ["your-transfer-cli", "describe", "{title}", "--machine", "{src}", "--json"]

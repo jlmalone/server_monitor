@@ -75,7 +75,10 @@ records — distinct from the live queue:
   only runs the configured argv with `{title}`/`{src}`/`{dst}` filled in.
 - **Logs** *(shipped)*: every launched transfer streams its combined output to a
   per-operation log; this tab live-tails the selected one so you can watch the
-  low-level work in real time and inspect failures.
+  low-level work in real time and inspect failures. Failures retry with **bounded
+  exponential backoff** (2/4/8/16 … up to `maxAttempts`, then stop — never a runaway)
+  with **Retry Now** / **Stop** / **Retry** controls. The History tab gains a **Clean**
+  button (when `history.clearCommand` is set) to prune the log.
 - **Inventory** *(when the tool exposes it as JSON)*: for each title, which machines
   hold it and whether a verified copy exists elsewhere.
 - **Reclaim** *(when the tool exposes it as JSON)*: what's safely reclaimable locally

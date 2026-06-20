@@ -140,6 +140,7 @@ struct TransfersSource: Codable {
 /// window says "not configured" — no host names or tool specifics in this repo.
 struct TransfersHistorySource: Codable {
     var command: [String]
+    var clearCommand: [String]?   // optional argv that prunes the history log; enables the Clean button
 }
 
 struct TransfersConfig: Codable {
@@ -371,10 +372,32 @@ final class TransferHistoryLoader: ObservableObject {
     let configured: Bool
 
     private let command: [String]?
+    private let clearCommand: [String]?
+
+    /// True when a `history.clearCommand` is configured — enables the Clean button.
+    var canClear: Bool { clearCommand?.isEmpty == false }
 
     init() {
-        self.command = TransfersConfig.load()?.history?.command
+        let history = TransfersConfig.load()?.history
+        self.command = history?.command
+        self.clearCommand = history?.clearCommand
         self.configured = (command?.isEmpty == false)
+    }
+
+    /// Run the configured prune command (e.g. drop FAILED entries from the log),
+    /// then reload. The app only runs the argv you configure — what "clean" means
+    /// is yours to define; it never edits a history store it wasn't told about.
+    func clear() {
+        guard let cmd = clearCommand, !cmd.isEmpty, !loading else { return }
+        loading = true
+        error = nil
+        Task.detached {
+            _ = Self.runArgv(cmd)
+            await MainActor.run { [weak self] in
+                self?.loading = false
+                self?.reload()
+            }
+        }
     }
 
     func reload() {

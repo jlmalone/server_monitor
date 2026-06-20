@@ -281,21 +281,37 @@ struct TransferLogsView: View {
         actions.operations.first { $0.id == selection }
     }
 
+    private var hasFinished: Bool {
+        actions.operations.contains { $0.state == .succeeded || $0.state == .failed || $0.state == .stopped }
+    }
+
     var body: some View {
-        HSplitView {
-            opList
-                .frame(minWidth: 240, idealWidth: 280)
-            if let op = selectedOp {
-                LogTailView(op: op)
-                    .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 36)).foregroundColor(.secondary).accessibilityHidden(true)
-                    Text(actions.operations.isEmpty ? "No transfers launched yet" : "Select a transfer to view its log")
-                        .foregroundColor(.secondary)
+        VStack(spacing: 0) {
+            if hasFinished {
+                HStack {
+                    Spacer()
+                    Button { actions.clearFinished() } label: { Label("Clear finished", systemImage: "trash") }
+                        .buttonStyle(.borderless).font(.caption)
+                        .help("Remove succeeded/failed/stopped transfers from this list (logs stay on disk)")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                Divider()
+            }
+            HSplitView {
+                opList
+                    .frame(minWidth: 240, idealWidth: 280)
+                if let op = selectedOp {
+                    LogTailView(op: op, actions: actions)
+                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 36)).foregroundColor(.secondary).accessibilityHidden(true)
+                        Text(actions.operations.isEmpty ? "No transfers launched yet" : "Select a transfer to view its log")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
     }
@@ -318,6 +334,14 @@ struct TransferLogsView: View {
                             Text(op.title).font(.callout).lineLimit(1).truncationMode(.middle)
                             Text("\(op.mode.rawValue) · \(op.routeText)")
                                 .font(.caption2).foregroundColor(.secondary)
+                            if op.state == .retrying, let at = op.nextRetryAt {
+                                HStack(spacing: 3) {
+                                    Text("retry in")
+                                    Text(at, style: .timer).monospacedDigit()
+                                    Text("· attempt \(op.attempt)/\(op.maxAttempts)")
+                                }
+                                .font(.caption2).foregroundColor(.orange)
+                            }
                         }
                     }
                     .tag(op.id)
@@ -328,7 +352,13 @@ struct TransferLogsView: View {
     }
 
     private func stateLabel(_ s: TransferState) -> String {
-        switch s { case .running: return "running"; case .succeeded: return "succeeded"; case .failed: return "failed" }
+        switch s {
+        case .running:   return "running"
+        case .retrying:  return "retrying after a failure"
+        case .succeeded: return "succeeded"
+        case .failed:    return "failed"
+        case .stopped:   return "stopped"
+        }
     }
 }
 
@@ -339,8 +369,10 @@ struct TransferStateDot: View {
         Group {
             switch state {
             case .running:   ProgressView().controlSize(.small)
+            case .retrying:  Image(systemName: "clock.arrow.circlepath").foregroundColor(.orange)
             case .succeeded: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
             case .failed:    Image(systemName: "xmark.octagon.fill").foregroundColor(.red)
+            case .stopped:   Image(systemName: "minus.circle.fill").foregroundColor(.secondary)
             }
         }
         .frame(width: 16)
@@ -374,14 +406,21 @@ final class LogTailer: ObservableObject {
 
 struct LogTailView: View {
     let op: TransferOperation
+    @ObservedObject var actions: TransferActionsModel
     @StateObject private var tailer = LogTailer()
+
+    private var isLive: Bool { op.state == .running || op.state == .retrying }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 TransferStateDot(state: op.state)
-                Text(op.title).font(.headline).lineLimit(1).truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(op.title).font(.headline).lineLimit(1).truncationMode(.middle)
+                    Text(statusLine).font(.caption2).foregroundColor(.secondary)
+                }
                 Spacer()
+                controls
                 Button {
                     NSWorkspace.shared.selectFile(op.logPath, inFileViewerRootedAtPath: "")
                 } label: { Label("Reveal Log", systemImage: "folder") }
@@ -398,12 +437,44 @@ struct LogTailView: View {
                     .padding(8)
             }
         }
-        .onAppear { tailer.start(path: op.logPath, live: op.state == .running) }
-        .onChange(of: op.state) { newState in
-            tailer.start(path: op.logPath, live: newState == .running)
-        }
+        .onAppear { tailer.start(path: op.logPath, live: isLive) }
+        .onChange(of: op.state) { _ in tailer.start(path: op.logPath, live: isLive) }
         .onDisappear { tailer.stop() }
-        .accessibilityLabel("Log for \(op.title)")
+        .accessibilityLabel("Log for \(op.title), \(statusLine)")
+    }
+
+    private var statusLine: String {
+        switch op.state {
+        case .running:   return "attempt \(op.attempt)/\(op.maxAttempts) · running"
+        case .retrying:  return "attempt \(op.attempt)/\(op.maxAttempts) failed · waiting to retry"
+        case .succeeded: return "completed on attempt \(op.attempt)"
+        case .failed:    return "failed after \(op.attempt) attempts"
+        case .stopped:   return "stopped after \(op.attempt) attempts"
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        switch op.state {
+        case .retrying:
+            if let at = op.nextRetryAt {
+                HStack(spacing: 3) {
+                    Text("retry in"); Text(at, style: .timer).monospacedDigit()
+                }
+                .font(.caption2).foregroundColor(.orange)
+            }
+            Button { actions.retryNow(op.id) } label: { Label("Retry Now", systemImage: "bolt.fill") }
+                .buttonStyle(.borderless).font(.caption)
+                .accessibilityLabel("Retry now, skipping the backoff wait")
+            Button { actions.stop(op.id) } label: { Label("Stop", systemImage: "stop.fill") }
+                .buttonStyle(.borderless).font(.caption).foregroundColor(.red)
+                .accessibilityLabel("Stop retrying")
+        case .failed, .stopped:
+            Button { actions.retry(op.id) } label: { Label("Retry", systemImage: "arrow.clockwise") }
+                .buttonStyle(.borderless).font(.caption)
+                .accessibilityLabel("Retry from the first attempt")
+        default:
+            EmptyView()
+        }
     }
 }
 

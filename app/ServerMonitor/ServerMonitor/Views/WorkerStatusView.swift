@@ -239,6 +239,7 @@ struct TransferHistoryTab: View {
     @State private var search = ""
     @State private var statusFilter = "FAILED"   // default to failures — the triage view
     @State private var selection: TransferHistoryRecord.ID?
+    @State private var confirmClean = false
 
     private let statuses = ["ALL", "FAILED", "COMPLETED", "CANCELLED"]
 
@@ -265,6 +266,12 @@ struct TransferHistoryTab: View {
             }
         }
         .onAppear { if loader.records.isEmpty { loader.reload() } }
+        .confirmationDialog("Clean transfer history?", isPresented: $confirmClean, titleVisibility: .visible) {
+            Button("Clean", role: .destructive) { loader.clear() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Runs your configured clean command to prune the history log on disk.")
+        }
     }
 
     @ViewBuilder private var controlBar: some View {
@@ -285,6 +292,11 @@ struct TransferHistoryTab: View {
             Text(countLabel).font(.caption).foregroundColor(.secondary)
             Button { loader.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 .disabled(loader.loading)
+            if loader.canClear {
+                Button(role: .destructive) { confirmClean = true } label: { Label("Clean", systemImage: "trash") }
+                    .disabled(loader.loading)
+                    .help("Prune the history log (runs your configured clean command)")
+            }
         }
         .padding(10)
     }

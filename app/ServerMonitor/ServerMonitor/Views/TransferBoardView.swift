@@ -52,6 +52,7 @@ final class PaneModel: ObservableObject {
     @Published private(set) var entries: [DirEntry] = []
     @Published private(set) var loading = false
     @Published private(set) var error: String?
+    @Published var selectedPath: String?
 
     let machines: [ManagerMachine]
     private var loadToken = 0
@@ -64,7 +65,7 @@ final class PaneModel: ObservableObject {
 
     func reload() {
         guard let machine else { return }
-        loading = true; error = nil
+        loading = true; error = nil; selectedPath = nil
         loadToken += 1
         let token = loadToken
         let m = machine, p = path
@@ -168,6 +169,7 @@ struct FilePaneView: View {
     let onDropInto: (TransferDragPayload, String, String) -> Void
 
     @State private var dropTargetPath: String?
+    @State private var currentDirDropActive = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -259,13 +261,16 @@ struct FilePaneView: View {
                 paneMessage(icon: "exclamationmark.triangle", title: error,
                             detail: "Check the machine is reachable, then Reload.")
             } else if pane.entries.isEmpty && !pane.loading {
-                paneMessage(icon: "tray", title: "Empty folder", detail: nil)
+                paneMessage(icon: "tray", title: "Empty folder",
+                            detail: "Drop here to transfer into this folder.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(pane.entries) { entry in
-                            FileRowView(entry: entry, machine: pane.machine?.label ?? "",
+                        ForEach(Array(pane.entries.enumerated()), id: \.element.id) { idx, entry in
+                            FileRowView(entry: entry, machine: pane.machine?.label ?? "", row: idx,
+                                        isSelected: pane.selectedPath == entry.path,
                                         isDropTarget: dropTargetPath == entry.path,
+                                        onSelect: { pane.selectedPath = entry.path },
                                         onOpen: { pane.enter(entry) },
                                         onDrop: { items in handleDrop(items, into: entry.path) },
                                         onHover: { hovering in
@@ -273,9 +278,9 @@ struct FilePaneView: View {
                                                 : (dropTargetPath == entry.path ? nil : dropTargetPath)
                                         },
                                         onMakeChicklet: { makeChicklet(entry) })
-                            Divider().opacity(0.4)
                         }
                     }
+                    .padding(.vertical, 2)
                 }
             }
             if pane.loading {
@@ -284,6 +289,19 @@ struct FilePaneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        // Dropping anywhere in the body that is not on a folder row targets the
+        // currently-open directory, so you can drop into the folder you're viewing.
+        .background(currentDirDropActive && dropTargetPath == nil ? Color.accentColor.opacity(0.10) : Color.clear)
+        .overlay {
+            if currentDirDropActive && dropTargetPath == nil {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2)
+                    .padding(1).allowsHitTesting(false)
+            }
+        }
+        .dropDestination(for: String.self) { items, _ in
+            handleDrop(items, into: pane.path)
+        } isTargeted: { currentDirDropActive = $0 }
     }
 
     private func paneMessage(icon: String, title: String, detail: String?) -> some View {
@@ -327,31 +345,36 @@ struct FilePaneView: View {
 struct FileRowView: View {
     let entry: DirEntry
     let machine: String
+    let row: Int
+    let isSelected: Bool
     let isDropTarget: Bool
+    let onSelect: () -> Void
     let onOpen: () -> Void
     let onDrop: ([String]) -> Bool
     let onHover: (Bool) -> Void
     let onMakeChicklet: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: entry.isDir ? "folder.fill" : "doc")
-                .foregroundColor(entry.isDir ? .accentColor : .secondary)
-                .frame(width: 18).accessibilityHidden(true)
-            Text(entry.name).font(.callout).lineLimit(1).truncationMode(.middle)
+        HStack(spacing: 7) {
+            Image(systemName: entry.isDir ? "folder.fill" : iconName)
+                .font(.system(size: 14)).foregroundStyle(iconColor)
+                .frame(width: 20).accessibilityHidden(true)
+            Text(entry.name).font(.system(size: 13))
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .lineLimit(1).truncationMode(.middle)
             Spacer()
             if let s = entry.size, !entry.isDir {
                 Text(ByteCountFormatter.string(fromByteCount: s, countStyle: .file))
-                    .font(.caption2).foregroundColor(.secondary)
-            } else if entry.isDir {
-                Image(systemName: "chevron.right").font(.caption2).foregroundColor(.secondary.opacity(0.5))
-                    .accessibilityHidden(true)
+                    .font(.system(size: 11))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : Color.secondary)
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(isDropTarget ? Color.accentColor.opacity(0.22) : Color.clear)
+        .padding(.horizontal, 9).padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rowBackground)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { if entry.isDir { onOpen() } }
+        .onTapGesture(count: 2) { if entry.isDir { onOpen() } else { onSelect() } }
+        .onTapGesture(count: 1) { onSelect() }
         .draggable(encodePayload(TransferDragPayload(
             machine: machine, path: entry.path, name: entry.name, isDir: entry.isDir, size: entry.size)))
         .modifier(FolderDrop(enabled: entry.isDir, onDrop: onDrop, onHover: onHover))
@@ -362,7 +385,34 @@ struct FileRowView: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityLabel(rowLabel)
+    }
+
+    @ViewBuilder private var rowBackground: some View {
+        if isSelected { Color.accentColor }
+        else if isDropTarget { Color.accentColor.opacity(0.22) }
+        else if row % 2 == 1 { Color.primary.opacity(0.04) }
+        else { Color.clear }
+    }
+
+    private var iconColor: Color {
+        if isSelected { return .white }
+        return entry.isDir ? Color(red: 0.36, green: 0.60, blue: 0.87) : .secondary
+    }
+
+    /// Finder-ish icon by file extension.
+    private var iconName: String {
+        switch (entry.name as NSString).pathExtension.lowercased() {
+        case "mkv", "mp4", "mov", "avi", "m4v", "webm", "ts": return "film"
+        case "mp3", "flac", "wav", "aac", "m4a", "m4b", "ogg": return "music.note"
+        case "jpg", "jpeg", "png", "gif", "heic", "webp", "tiff", "bmp": return "photo"
+        case "zip", "gz", "tar", "7z", "rar", "bz2", "xz": return "doc.zipper"
+        case "pdf": return "doc.richtext"
+        case "txt", "md", "json", "log", "csv", "srt", "ass", "vtt", "yml", "yaml": return "doc.text"
+        case "app", "dmg", "pkg": return "shippingbox"
+        default: return "doc"
+        }
     }
 
     private var rowLabel: String {

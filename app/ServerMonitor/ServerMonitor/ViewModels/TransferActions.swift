@@ -1,66 +1,252 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Transfer actions (drag-and-drop between machines)
+// MARK: - Manager backend (dual-pane cross-machine file manager)
 //
-// Lets you drag a title from the Transfer History onto another machine to copy
-// or move it there. WHAT actually performs the transfer is machine-specific and
-// lives ONLY in untracked ~/.config/server-monitor/transfers.json under the
-// optional "transfer" key — this open-source code just substitutes {title},
-// {src}, {dst} into the configured argv and runs it, capturing every byte of
-// output to a per-operation log you can inspect live. No host names or tool
-// specifics here. With no "transfer" config the drag-and-drop surface is inert.
+// The "Files" tab browses directories on each configured machine and transfers
+// between them. WHAT lists a remote dir and WHAT performs a transfer is machine-
+// specific and lives ONLY in untracked ~/.config/server-monitor/transfers.json
+// under the "manager" key (machine ssh targets + a transferCommand argv). This
+// open-source code only runs the configured argv, or a generic `ls` against an
+// ssh target supplied by config, substituting values per-element (never into a
+// shell string, so paths with spaces or metacharacters can't inject). With no
+// "manager" config the surface is inert. No host names or tool specifics here.
 //
-// Retries are BOUNDED: a failed transfer backs off exponentially up to
-// maxAttempts and then stops — the app can never become a runaway retry loop.
-// You can always skip the wait (Retry Now) or abandon it (Stop).
+// Transfers stream to a per-operation log you can live-tail in the Logs tab, and
+// retry with BOUNDED exponential backoff so the app can never become a runaway
+// loop.
+
+// MARK: - Config
+
+struct ManagerMachine: Codable, Identifiable, Hashable {
+    var label: String
+    var local: Bool?
+    var ssh: String?            // user@host for remote machines; nil when local
+    var start: String?          // initial directory
+    var id: String { label }
+    var isLocal: Bool { local == true }
+    var startPath: String { start ?? (isLocal ? NSHomeDirectory() : "/") }
+}
+
+struct ManagerConfig: Codable {
+    var machines: [ManagerMachine]?
+    var transferCommand: [String]?   // argv with {mode}/{srcMachine}/{srcPath}/{dstMachine}/{dstPath}
+    var moveEnabled: Bool?
+    var chickletsPath: String?
+    var logDir: String?
+    var maxAttempts: Int?
+    var backoffBaseSeconds: Double?
+
+    static func load() -> ManagerConfig? {
+        let path = (NSHomeDirectory() as NSString)
+            .appendingPathComponent(".config/server-monitor/transfers.json")
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        struct Wrapper: Codable { var manager: ManagerConfig? }
+        return (try? JSONDecoder().decode(Wrapper.self, from: data))?.manager
+    }
+}
+
+// MARK: - Directory entries + listing
+
+struct DirEntry: Identifiable, Hashable {
+    let name: String
+    let isDir: Bool
+    let size: Int64?
+    let path: String            // full absolute path on its machine
+    var id: String { path }
+}
+
+enum ListError: Error, LocalizedError {
+    case unreachable(String)
+    case failed(String)
+    var errorDescription: String? {
+        switch self {
+        case .unreachable(let m): return "\(m) is unreachable"
+        case .failed(let s): return s
+        }
+    }
+}
+
+/// Lists a directory on a machine. Local machines use FileManager; remote ones
+/// run `ls -lAp` over ssh (the ssh target comes from config, the command does
+/// not). Dotfiles are hidden, matching Finder.
+enum DirectoryLister {
+    static func list(machine: ManagerMachine, path: String) async throws -> [DirEntry] {
+        if machine.isLocal { return try listLocal(path: path) }
+        guard let target = machine.ssh, !target.isEmpty else {
+            throw ListError.failed("no ssh target configured for \(machine.label)")
+        }
+        return try await listRemote(target: target, machineLabel: machine.label, path: path)
+    }
+
+    private static func listLocal(path: String) throws -> [DirEntry] {
+        let fm = FileManager.default
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        let contents = try fm.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey], options: [.skipsHiddenFiles])
+        var out: [DirEntry] = []
+        for u in contents {
+            let vals = try? u.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+            let isDir = vals?.isDirectory ?? false
+            out.append(DirEntry(name: u.lastPathComponent, isDir: isDir,
+                                size: isDir ? nil : vals?.fileSize.map(Int64.init), path: u.path))
+        }
+        return sortEntries(out)
+    }
+
+    private static func listRemote(target: String, machineLabel: String, path: String) async throws -> [DirEntry] {
+        let remote = "cd -- \(shQuote(path)) && /bin/ls -lAp"
+        let r = await run(["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target, remote])
+        if r.status == 255 { throw ListError.unreachable(machineLabel) }
+        if r.status != 0 {
+            let msg = r.err.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw ListError.failed(msg.isEmpty ? "ls exited \(r.status)" : msg)
+        }
+        return sortEntries(parseLS(r.out, parent: path))
+    }
+
+    // MARK: helpers
+
+    private static func sortEntries(_ e: [DirEntry]) -> [DirEntry] {
+        e.sorted { a, b in
+            if a.isDir != b.isDir { return a.isDir }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// Parse BSD `ls -lAp`. Skips the "total" line and dotfiles; a leading 'd'
+    /// perm (or a trailing slash) marks a directory; the name is everything after
+    /// the 8th whitespace field (preserving spaces), with " -> target" stripped.
+    private static func parseLS(_ text: String, parent: String) -> [DirEntry] {
+        var out: [DirEntry] = []
+        for raw in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            let line = String(raw)
+            if line.hasPrefix("total ") { continue }
+            let fields = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard let perms = fields.first.map(String.init), !perms.isEmpty else { continue }
+            guard var name = nameAfterFields(line, count: 8), !name.isEmpty else { continue }
+            if perms.hasPrefix("l"), let r = name.range(of: " -> ") { name = String(name[..<r.lowerBound]) }
+            var isDir = perms.hasPrefix("d")
+            if name.hasSuffix("/") { isDir = true; name.removeLast() }
+            if name.hasPrefix(".") || name == "." || name == ".." { continue }
+            let size = fields.count > 4 ? Int64(fields[4]) : nil
+            let full = (parent as NSString).appendingPathComponent(name)
+            out.append(DirEntry(name: name, isDir: isDir, size: isDir ? nil : size, path: full))
+        }
+        return out
+    }
+
+    /// Substring after the first `count` whitespace-delimited fields, verbatim,
+    /// so names containing spaces survive intact.
+    private static func nameAfterFields(_ line: String, count: Int) -> String? {
+        var idx = line.startIndex
+        var fields = 0
+        let end = line.endIndex
+        while idx < end {
+            while idx < end, line[idx] == " " { idx = line.index(after: idx) }
+            if idx >= end { break }
+            if fields == count { return String(line[idx...]) }
+            while idx < end, line[idx] != " " { idx = line.index(after: idx) }
+            fields += 1
+        }
+        return nil
+    }
+
+    private static func shQuote(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private static func run(_ argv: [String]) async -> (status: Int32, out: String, err: String) {
+        await Task.detached {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: argv[0])
+            p.arguments = Array(argv.dropFirst())
+            let o = Pipe(); let e = Pipe()
+            p.standardOutput = o; p.standardError = e
+            do { try p.run() } catch { return (127, "", error.localizedDescription) }
+            let od = o.fileHandleForReading.readDataToEndOfFile()
+            let ed = e.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return (p.terminationStatus,
+                    String(data: od, encoding: .utf8) ?? "",
+                    String(data: ed, encoding: .utf8) ?? "")
+        }.value
+    }
+}
+
+// MARK: - Chicklets (pinned root shortcuts, mirrored on both panes)
+
+struct Chicklet: Codable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var machine: String
+    var path: String
+}
+
+@MainActor
+final class ChickletStore: ObservableObject {
+    @Published private(set) var items: [Chicklet] = []
+    private let path: String?
+
+    init(path: String?) {
+        self.path = path.map { ($0 as NSString).expandingTildeInPath }
+        load()
+    }
+
+    func load() {
+        guard let path, let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let list = try? JSONDecoder().decode([Chicklet].self, from: data) else { return }
+        items = list
+    }
+
+    func add(label: String, machine: String, path dirPath: String) {
+        let id = "\(machine):\(dirPath)"
+        guard !items.contains(where: { $0.id == id }) else { return }
+        items.append(Chicklet(id: id, label: label, machine: machine, path: dirPath))
+        save()
+    }
+
+    func remove(_ c: Chicklet) {
+        items.removeAll { $0.id == c.id }
+        save()
+    }
+
+    private func save() {
+        guard let path else { return }
+        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted]
+        guard let data = try? enc.encode(items) else { return }
+        try? data.write(to: URL(fileURLWithPath: path))
+    }
+}
+
+// MARK: - Transfer operations engine (Logs tab)
 
 enum TransferMode: String { case copy = "Copy", move = "Move" }
 enum TransferState { case running, retrying, succeeded, failed, stopped }
 
-/// Command templates, machine list, and retry policy for the drag-and-drop
-/// surface. `copyCommand` / `moveCommand` are argv with `{title}` / `{src}` /
-/// `{dst}` placeholders the app fills in (substituted into single argv elements —
-/// never concatenated into a shell string, so titles with spaces or
-/// metacharacters can't inject).
-struct TransferActionsConfig: Codable {
-    var machines: [String]?         // explicit drop targets; else derived from history
-    var copyCommand: [String]?      // e.g. ["your-transfer-cli","send","{title}","{dst}:/inbox/"]
-    var moveCommand: [String]?      // adds delete-after; Move is disabled if omitted
-    var describeCommand: [String]?  // optional: prints {"files":N,"folders":M} for exact counts
-    var logDir: String?             // where per-op logs are written; defaults under ~/.config
-    var maxAttempts: Int?           // total tries incl. the first (default 5; clamped ≥ 1)
-    var backoffBaseSeconds: Double? // first retry delay, doubling each time (default 2)
-
-    static func load() -> TransferActionsConfig? {
-        let path = (NSHomeDirectory() as NSString)
-            .appendingPathComponent(".config/server-monitor/transfers.json")
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
-        struct Wrapper: Codable { var transfer: TransferActionsConfig? }
-        return (try? JSONDecoder().decode(Wrapper.self, from: data))?.transfer
-    }
-}
-
-/// One launched transfer: its identity, route, the log file collecting every
-/// attempt's output, and its live retry state.
 struct TransferOperation: Identifiable {
     let id: String
-    let title: String
-    let src: String
-    let dst: String
+    let title: String           // source basename, for display
+    let src: String             // "machine:path"
+    let dst: String             // "machine:path"
     let mode: TransferMode
     let logPath: String
     let startedAt: Date
     var state: TransferState
-    var attempt: Int            // 1-based; how many tries have run
+    var attempt: Int
     let maxAttempts: Int
-    var nextRetryAt: Date?      // when the backoff timer will fire (for the countdown)
+    var nextRetryAt: Date?
 
     var routeText: String { "\(src) → \(dst)" }
 }
 
-/// Exact composition of a draggable item, when a `describeCommand` can supply it.
-struct TransferDescription: Codable { let files: Int?; let folders: Int? }
+private struct TransferArgs {
+    let mode: TransferMode
+    let srcMachine: String
+    let srcPath: String
+    let dstMachine: String
+    let dstPath: String
+}
 
 @MainActor
 final class TransferActionsModel: ObservableObject {
@@ -69,67 +255,59 @@ final class TransferActionsModel: ObservableObject {
 
     let configured: Bool
     let canMove: Bool
-    let configuredMachines: [String]
+    let machines: [ManagerMachine]
+    let chickletsPath: String?
     let maxAttempts: Int
 
-    private let config: TransferActionsConfig?
+    private let config: ManagerConfig?
     private let backoffBase: Double
     private var seq = 0
     private var retryTimers: [String: Timer] = [:]
+    /// Per-op argument tuple so retries rebuild the command without re-deriving it.
+    private var opArgs: [String: TransferArgs] = [:]
 
     init() {
-        self.config = TransferActionsConfig.load()
-        self.configured = (config?.copyCommand?.isEmpty == false)
-        self.canMove = (config?.moveCommand?.isEmpty == false)
-        self.configuredMachines = config?.machines ?? []
-        self.maxAttempts = max(1, config?.maxAttempts ?? 5)
-        self.backoffBase = max(0.5, config?.backoffBaseSeconds ?? 2)
+        let cfg = ManagerConfig.load()
+        self.config = cfg
+        self.configured = (cfg?.transferCommand?.isEmpty == false) && (cfg?.machines?.isEmpty == false)
+        self.canMove = (cfg?.moveEnabled == true)
+        self.machines = cfg?.machines ?? []
+        self.chickletsPath = cfg?.chickletsPath
+        self.maxAttempts = max(1, cfg?.maxAttempts ?? 5)
+        self.backoffBase = max(0.5, cfg?.backoffBaseSeconds ?? 2)
     }
 
-    /// True when `mode` has a command configured (Copy always; Move only if set).
-    func supports(_ mode: TransferMode) -> Bool { template(for: mode)?.isEmpty == false }
+    /// True when `mode` is available (Copy always; Move only if enabled).
+    func supports(_ mode: TransferMode) -> Bool { mode == .copy || canMove }
 
-    /// Optional exact files/folders breakdown via `describeCommand`. Returns nil
-    /// when unconfigured or on any failure — callers fall back to the counts the
-    /// dragged history row already carries.
-    func describe(title: String, src: String) async -> TransferDescription? {
-        guard let tmpl = config?.describeCommand, !tmpl.isEmpty else { return nil }
-        let argv = tmpl.map { Self.fill($0, title: title, src: src, dst: "") }
-        return await Task.detached {
-            let r = Self.run(argv)
-            guard r.status == 0, let data = r.output.data(using: .utf8) else { return nil }
-            return try? JSONDecoder().decode(TransferDescription.self, from: data)
-        }.value
-    }
-
-    /// Launch a transfer (attempt 1). Output streams to a fresh per-op log; on
-    /// failure it auto-retries with exponential backoff up to `maxAttempts`.
-    func start(title: String, src: String, dst: String, mode: TransferMode) {
-        guard let tmpl = template(for: mode), !tmpl.isEmpty, src != dst else { return }
+    /// Launch a transfer of a file/folder from one machine to another (attempt 1).
+    func startTransfer(name: String, srcMachine: String, srcPath: String,
+                       dstMachine: String, dstPath: String, mode: TransferMode) {
+        guard let tmpl = config?.transferCommand, !tmpl.isEmpty else { return }
         seq += 1
         let id = "op-\(seq)-\(Int(Date().timeIntervalSince1970))"
-        let logPath = Self.logFile(dir: config?.logDir, id: id, title: title)
-        let op = TransferOperation(id: id, title: title, src: src, dst: dst, mode: mode,
-                                   logPath: logPath, startedAt: Date(), state: .running,
+        let logPath = Self.logFile(dir: config?.logDir, id: id, title: name)
+        opArgs[id] = TransferArgs(mode: mode, srcMachine: srcMachine, srcPath: srcPath,
+                                  dstMachine: dstMachine, dstPath: dstPath)
+        let op = TransferOperation(id: id, title: name,
+                                   src: "\(srcMachine):\(srcPath)", dst: "\(dstMachine):\(dstPath)",
+                                   mode: mode, logPath: logPath, startedAt: Date(), state: .running,
                                    attempt: 0, maxAttempts: maxAttempts, nextRetryAt: nil)
         operations.insert(op, at: 0)
         runAttempt(id)
     }
 
-    /// Skip the backoff wait and try again immediately.
     func retryNow(_ id: String) {
         cancelTimer(id)
         guard let op = operations.first(where: { $0.id == id }), op.state == .retrying else { return }
         runAttempt(id)
     }
 
-    /// Give up: cancel any pending retry and mark the op stopped.
     func stop(_ id: String) {
         cancelTimer(id)
         update(id) { $0.state = .stopped; $0.nextRetryAt = nil }
     }
 
-    /// Restart a finished (failed/stopped) op from a clean attempt count.
     func retry(_ id: String) {
         cancelTimer(id)
         guard let op = operations.first(where: { $0.id == id }) else { return }
@@ -138,21 +316,22 @@ final class TransferActionsModel: ObservableObject {
         runAttempt(id)
     }
 
-    /// Drop finished ops (succeeded/failed/stopped) from the list; running and
-    /// retrying ops are kept. Their log files are left on disk for inspection.
     func clearFinished() {
+        for op in operations where op.state == .succeeded || op.state == .failed || op.state == .stopped {
+            opArgs[op.id] = nil
+        }
         operations.removeAll { $0.state == .succeeded || $0.state == .failed || $0.state == .stopped }
     }
 
-    // MARK: - attempt loop
+    // MARK: attempt loop
 
     private func runAttempt(_ id: String) {
-        guard let op = operations.first(where: { $0.id == id }) else { return }
-        guard let tmpl = template(for: op.mode), !tmpl.isEmpty else { return }
+        guard let op = operations.first(where: { $0.id == id }), let a = opArgs[id],
+              let tmpl = config?.transferCommand, !tmpl.isEmpty else { return }
         let attempt = op.attempt + 1
         update(id) { $0.state = .running; $0.attempt = attempt; $0.nextRetryAt = nil }
 
-        let argv = tmpl.map { Self.fill($0, title: op.title, src: op.src, dst: op.dst) }
+        let argv = tmpl.map { Self.fill($0, a) }
         let header = "── \(op.mode.rawValue) attempt \(attempt)/\(op.maxAttempts)  \(op.src) → \(op.dst)\n$ \(argv.joined(separator: " "))\n\n"
         Task.detached {
             let ok = Self.runToLog(argv: argv, logPath: op.logPath, header: header)
@@ -163,13 +342,13 @@ final class TransferActionsModel: ObservableObject {
     private func completed(_ id: String, ok: Bool) {
         guard let op = operations.first(where: { $0.id == id }) else { return }
         if ok { update(id) { $0.state = .succeeded; $0.nextRetryAt = nil }; return }
-        if op.state == .stopped { return }                       // user abandoned mid-attempt
-        guard op.attempt < op.maxAttempts else {                 // bounded — give up cleanly
+        if op.state == .stopped { return }
+        guard op.attempt < op.maxAttempts else {
             update(id) { $0.state = .failed; $0.nextRetryAt = nil }
             Self.appendLine(op.logPath, "— gave up after \(op.attempt) attempts —")
             return
         }
-        let delay = backoffBase * pow(2, Double(op.attempt - 1))  // 2, 4, 8, 16 … seconds
+        let delay = backoffBase * pow(2, Double(op.attempt - 1))
         let fireAt = Date().addingTimeInterval(delay)
         update(id) { $0.state = .retrying; $0.nextRetryAt = fireAt }
         Self.appendLine(op.logPath, "— attempt \(op.attempt) failed; retrying in \(Int(delay))s —")
@@ -192,18 +371,14 @@ final class TransferActionsModel: ObservableObject {
         change(&operations[i])
     }
 
-    private func template(for mode: TransferMode) -> [String]? {
-        mode == .move ? config?.moveCommand : config?.copyCommand
-    }
+    // MARK: shell + files
 
-    // MARK: - shell + files
-
-    /// Substitute placeholders into one argv element. Done per-element so values
-    /// are never concatenated into a shell string (no injection surface).
-    private nonisolated static func fill(_ s: String, title: String, src: String, dst: String) -> String {
-        s.replacingOccurrences(of: "{title}", with: title)
-            .replacingOccurrences(of: "{src}", with: src)
-            .replacingOccurrences(of: "{dst}", with: dst)
+    private nonisolated static func fill(_ s: String, _ a: TransferArgs) -> String {
+        s.replacingOccurrences(of: "{mode}", with: a.mode == .move ? "move" : "copy")
+            .replacingOccurrences(of: "{srcMachine}", with: a.srcMachine)
+            .replacingOccurrences(of: "{srcPath}", with: a.srcPath)
+            .replacingOccurrences(of: "{dstMachine}", with: a.dstMachine)
+            .replacingOccurrences(of: "{dstPath}", with: a.dstPath)
     }
 
     private nonisolated static func logDirURL(_ configured: String?) -> URL {
@@ -252,22 +427,7 @@ final class TransferActionsModel: ObservableObject {
         try? h.close()
     }
 
-    private nonisolated static func run(_ argv: [String]) -> (status: Int32, output: String) {
-        guard !argv.isEmpty else { return (1, "") }
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        p.arguments = ["-lc", "exec \"$@\"", "transfer"] + argv
-        let out = Pipe()
-        p.standardOutput = out
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return (127, "") }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
-    }
-
-    /// Tail of a log file for the live viewer — last `maxBytes` so a chatty
-    /// transfer log stays cheap to render.
+    /// Tail of a log file for the live viewer — last `maxBytes`.
     nonisolated static func tail(_ path: String, maxBytes: UInt64 = 64_000) -> String {
         guard let fh = FileHandle(forReadingAtPath: path) else { return "" }
         defer { try? fh.close() }

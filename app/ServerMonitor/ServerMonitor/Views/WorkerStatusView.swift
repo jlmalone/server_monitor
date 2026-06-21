@@ -172,11 +172,11 @@ struct TransferHistoryWindow: View {
 
     var body: some View {
         TabView {
+            ManagerView(actions: actions)
+                .tabItem { Label("Files", systemImage: "rectangle.split.2x1") }
+
             TransferHistoryTab()
                 .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-
-            TransferBoardView(actions: actions)
-                .tabItem { Label("Transfer", systemImage: "arrow.left.arrow.right") }
 
             TransferLogsView(actions: actions)
                 .tabItem { Label("Logs", systemImage: "doc.text.magnifyingglass") }
@@ -197,7 +197,7 @@ struct TransferHistoryWindow: View {
             )
             .tabItem { Label("Reclaim", systemImage: "trash.slash") }
         }
-        .frame(minWidth: 720, minHeight: 460)
+        .frame(minWidth: 860, minHeight: 520)
     }
 }
 

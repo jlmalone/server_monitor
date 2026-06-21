@@ -2,172 +2,156 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-// MARK: - Transfer board (drag a title onto a machine to copy/move it)
+// MARK: - Manager (dual-pane cross-machine file browser + transfer)
 //
-// Lives as two extra tabs in the Transfer History window. The "Transfer" tab
-// lists distinct titles seen in history; drag one onto a machine chip to copy or
-// move it there. The "Logs" tab live-tails the output of each launched
-// operation. All behaviour is config-driven via TransferActionsModel — inert
-// when no "transfer" block is configured.
+// The "Files" tab: two Finder-style panes, each browsing a chosen machine's
+// directories. Drag a row from one pane onto a folder (or the path bar) of the
+// other to copy or move it into that exact directory. "Chicklets" are pinned
+// root shortcuts shown identically above both panes; right-click a folder to
+// make one. All behaviour is config-driven via TransferActionsModel — inert when
+// no "manager" block is configured.
 
-/// SOH-delimited drag payload (title + current machine + counts). SOH (\u{1})
-/// can't appear in a filename/title, so it's a safe field separator.
-private let kDragDelim = "\u{1}"
+// MARK: Drag payload
 
-private func encodeDrag(_ item: TransferItem) -> String {
-    [item.title, item.src, item.files.map(String.init) ?? "", item.bytes.map(String.init) ?? ""]
-        .joined(separator: kDragDelim)
+struct TransferDragPayload {
+    let machine: String
+    let path: String
+    let name: String
+    let isDir: Bool
+    let size: Int64?
 }
 
-private func decodeDrag(_ s: String) -> TransferItem? {
-    let f = s.components(separatedBy: kDragDelim)
-    guard f.count >= 2, !f[0].isEmpty else { return nil }
-    return TransferItem(title: f[0], src: f[1],
-                        files: f.count > 2 ? Int(f[2]) : nil,
-                        bytes: f.count > 3 ? Int64(f[3]) : nil)
+private let kDelim = "\u{1}"
+
+private func encodePayload(_ p: TransferDragPayload) -> String {
+    [p.machine, p.path, p.name, p.isDir ? "1" : "0", p.size.map(String.init) ?? ""]
+        .joined(separator: kDelim)
 }
 
-/// Strip the operation prefix the transfer tool records on each item (e.g. "send:Foo" → "Foo").
-private func stripOp(_ s: String) -> String {
-    for p in ["send:", "move:", "copy:", "pull:", "push:", "sync:"] where s.hasPrefix(p) {
-        return String(s.dropFirst(p.count))
-    }
-    return s
+private func decodePayload(_ s: String) -> TransferDragPayload? {
+    let f = s.components(separatedBy: kDelim)
+    guard f.count >= 4, !f[0].isEmpty, !f[1].isEmpty else { return nil }
+    return TransferDragPayload(machine: f[0], path: f[1], name: f[2], isDir: f[3] == "1",
+                               size: f.count > 4 ? Int64(f[4]) : nil)
 }
 
-struct TransferItem: Identifiable, Equatable {
-    var id: String { title }
-    let title: String
-    let src: String          // machine the title currently lives on (drag source)
-    let files: Int?
-    let bytes: Int64?
-}
-
-/// A pending drop awaiting Copy/Move/Cancel.
-private struct PendingDrop: Identifiable {
+/// A pending drop awaiting Copy / Move / Cancel.
+private struct PendingTransfer: Identifiable {
     let id = UUID()
-    let item: TransferItem
-    let dst: String
+    let payload: TransferDragPayload
+    let destMachine: String
+    let destPath: String
 }
 
-struct TransferBoardView: View {
-    @ObservedObject var actions: TransferActionsModel
-    @StateObject private var loader = TransferHistoryLoader()
-    @State private var search = ""
-    @State private var pending: PendingDrop?
-    @State private var dropTarget: String?
+// MARK: Pane model
 
-    private var items: [TransferItem] {
-        var seen = Set<String>(); var out: [TransferItem] = []
-        for r in loader.records {
-            let title = stripOp((r.repositories?.first).map { $0 } ?? "")
-            guard !title.isEmpty, !seen.contains(title) else { continue }
-            seen.insert(title)
-            out.append(TransferItem(title: title,
-                                    src: r.targetMachine ?? r.sourceMachine ?? "",
-                                    files: r.filesTransferred, bytes: r.bytesTransferred))
-            if out.count >= 400 { break }
-        }
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty ? out : out.filter { $0.title.lowercased().contains(q) }
+@MainActor
+final class PaneModel: ObservableObject {
+    @Published var machine: ManagerMachine?
+    @Published var path: String
+    @Published private(set) var entries: [DirEntry] = []
+    @Published private(set) var loading = false
+    @Published private(set) var error: String?
+
+    let machines: [ManagerMachine]
+    private var loadToken = 0
+
+    init(machine: ManagerMachine?, machines: [ManagerMachine]) {
+        self.machine = machine
+        self.machines = machines
+        self.path = machine?.startPath ?? "/"
     }
 
-    private var machines: [String] {
-        var s = Set(actions.configuredMachines)
-        for r in loader.records {
-            if let m = r.sourceMachine { s.insert(m) }
-            if let m = r.targetMachine { s.insert(m) }
+    func reload() {
+        guard let machine else { return }
+        loading = true; error = nil
+        loadToken += 1
+        let token = loadToken
+        let m = machine, p = path
+        Task {
+            do {
+                let result = try await DirectoryLister.list(machine: m, path: p)
+                guard token == loadToken else { return }
+                entries = result; loading = false
+            } catch {
+                guard token == loadToken else { return }
+                self.error = error.localizedDescription; entries = []; loading = false
+            }
         }
-        return s.sorted()
+    }
+
+    func enter(_ entry: DirEntry) {
+        guard entry.isDir else { return }
+        path = entry.path; reload()
+    }
+
+    func up() {
+        let parent = (path as NSString).deletingLastPathComponent
+        path = parent.isEmpty ? "/" : parent
+        reload()
+    }
+
+    func switchMachine(_ m: ManagerMachine) {
+        machine = m; path = m.startPath; reload()
+    }
+
+    func jump(machine m: ManagerMachine, path p: String) {
+        machine = m; path = p; reload()
+    }
+}
+
+// MARK: Manager view (two panes + shared chicklets)
+
+struct ManagerView: View {
+    @ObservedObject var actions: TransferActionsModel
+    @StateObject private var chicklets: ChickletStore
+    @StateObject private var left: PaneModel
+    @StateObject private var right: PaneModel
+    @State private var pending: PendingTransfer?
+
+    init(actions: TransferActionsModel) {
+        _actions = ObservedObject(wrappedValue: actions)
+        _chicklets = StateObject(wrappedValue: ChickletStore(path: actions.chickletsPath))
+        let ms = actions.machines
+        _left = StateObject(wrappedValue: PaneModel(machine: ms.first, machines: ms))
+        _right = StateObject(wrappedValue: PaneModel(machine: ms.count > 1 ? ms[1] : ms.first, machines: ms))
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !actions.configured {
+        Group {
+            if actions.configured {
+                HSplitView {
+                    FilePaneView(pane: left, chicklets: chicklets, actions: actions,
+                                 onDropInto: requestTransfer)
+                        .frame(minWidth: 320)
+                    FilePaneView(pane: right, chicklets: chicklets, actions: actions,
+                                 onDropInto: requestTransfer)
+                        .frame(minWidth: 320)
+                }
+            } else {
                 placeholder
-            } else {
-                machineStrip
-                Divider()
-                itemList
             }
         }
-        .onAppear { if loader.records.isEmpty { loader.reload() } }
-        .sheet(item: $pending) { drop in
-            TransferConfirmSheet(actions: actions, item: drop.item, dst: drop.dst) { pending = nil }
+        .sheet(item: $pending) { p in
+            TransferConfirmSheet(actions: actions, payload: p.payload,
+                                 destMachine: p.destMachine, destPath: p.destPath) { pending = nil }
         }
     }
 
-    // MARK: pieces
-
-    private var machineStrip: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Drag a title onto a machine to transfer it there")
-                .font(.caption).foregroundColor(.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(machines, id: \.self) { machine in
-                        machineChip(machine)
-                    }
-                    if machines.isEmpty {
-                        Text("no machines found in history").font(.caption).foregroundColor(.secondary)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .padding(10)
-    }
-
-    private func machineChip(_ machine: String) -> some View {
-        let active = dropTarget == machine
-        return Label(machine, systemImage: "desktopcomputer")
-            .font(.caption.bold())
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8)
-                .fill((active ? Color.accentColor : Color.secondary).opacity(active ? 0.30 : 0.12)))
-            .overlay(RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(active ? Color.accentColor : .clear, lineWidth: 1.5))
-            .contentShape(Rectangle())
-            .dropDestination(for: String.self) { payloads, _ in
-                guard let item = payloads.first.flatMap(decodeDrag), item.src != machine else { return false }
-                pending = PendingDrop(item: item, dst: machine)
-                return true
-            } isTargeted: { dropTarget = $0 ? machine : (dropTarget == machine ? nil : dropTarget) }
-            .accessibilityLabel("Transfer destination \(machine). Drop a title here to copy or move it to \(machine).")
-    }
-
-    private var itemList: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary).accessibilityHidden(true)
-                TextField("Search titles", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Search titles to transfer")
-                Text("\(items.count)").font(.caption).foregroundColor(.secondary)
-            }
-            .padding(10)
-            Divider()
-            if items.isEmpty {
-                Spacer()
-                Text(loader.loading ? "loading…" : "no titles in history yet")
-                    .foregroundColor(.secondary)
-                Spacer()
-            } else {
-                List(items) { item in
-                    TransferItemRow(item: item)
-                        .draggable(encodeDrag(item))
-                }
-                .listStyle(.inset)
-            }
-        }
+    /// Bubble a drop up into a Copy/Move confirmation, unless it would be a no-op.
+    private func requestTransfer(_ payload: TransferDragPayload, _ destMachine: String, _ destPath: String) {
+        let dst = destPath.hasSuffix("/") ? String(destPath.dropLast()) : destPath
+        if payload.machine == destMachine, (payload.path as NSString).deletingLastPathComponent == dst { return }
+        if payload.machine == destMachine, payload.path == dst { return }
+        pending = PendingTransfer(payload: payload, destMachine: destMachine, destPath: dst)
     }
 
     private var placeholder: some View {
         VStack(spacing: 8) {
-            Image(systemName: "arrow.left.arrow.right.circle")
+            Image(systemName: "rectangle.split.2x1")
                 .font(.system(size: 40)).foregroundColor(.secondary).accessibilityHidden(true)
-            Text("Drag-and-drop transfers not configured").font(.headline)
-            Text("Add a \u{201C}transfer\u{201D} block (machines + copyCommand) to ~/.config/server-monitor/transfers.json — see config/transfers.example.json.")
+            Text("Manager not configured").font(.headline)
+            Text("Add a \u{201C}manager\u{201D} block (machines + transferCommand) to ~/.config/server-monitor/transfers.json — see config/transfers.example.json.")
                 .font(.caption).foregroundColor(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 460)
         }
@@ -175,32 +159,232 @@ struct TransferBoardView: View {
     }
 }
 
-/// One draggable title row.
-struct TransferItemRow: View {
-    let item: TransferItem
+// MARK: One pane
+
+struct FilePaneView: View {
+    @ObservedObject var pane: PaneModel
+    @ObservedObject var chicklets: ChickletStore
+    @ObservedObject var actions: TransferActionsModel
+    let onDropInto: (TransferDragPayload, String, String) -> Void
+
+    @State private var dropTargetPath: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            machineBar
+            Divider()
+            chickletBar
+            Divider()
+            pathBar
+            Divider()
+            content
+        }
+        .onAppear { if pane.entries.isEmpty && pane.error == nil && !pane.loading { pane.reload() } }
+    }
+
+    // MARK: bars
+
+    private var machineBar: some View {
+        HStack(spacing: 8) {
+            Menu {
+                ForEach(pane.machines) { m in
+                    Button { pane.switchMachine(m) } label: {
+                        Label(m.label, systemImage: m.isLocal ? "laptopcomputer" : "server.rack")
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: (pane.machine?.isLocal ?? false) ? "laptopcomputer" : "server.rack")
+                    Text(pane.machine?.label ?? "—").fontWeight(.semibold)
+                    Image(systemName: "chevron.down").font(.caption2)
+                }
+            }
+            .menuStyle(.borderlessButton).fixedSize()
+            .accessibilityLabel("Machine for this pane: \(pane.machine?.label ?? "none"). Click to switch.")
+            Spacer()
+            Button { pane.reload() } label: { Image(systemName: "arrow.clockwise") }
+                .buttonStyle(.borderless).help("Reload this directory")
+                .accessibilityLabel("Reload")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+    }
+
+    private var chickletBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                if chicklets.items.isEmpty {
+                    Text("no shortcuts yet — right-click a folder to pin it")
+                        .font(.caption2).foregroundColor(.secondary)
+                }
+                ForEach(chicklets.items) { c in
+                    Button { jump(c) } label: {
+                        Label(c.label, systemImage: "bookmark.fill").font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.14)))
+                    .help("\(c.machine):\(c.path)")
+                    .contextMenu { Button(role: .destructive) { chicklets.remove(c) } label: { Label("Remove shortcut", systemImage: "trash") } }
+                    .accessibilityLabel("Shortcut \(c.label), \(c.machine) \(c.path). Opens this pane there.")
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 5)
+        }
+        .frame(height: 30)
+    }
+
+    private var pathBar: some View {
+        HStack(spacing: 8) {
+            Button { pane.up() } label: { Image(systemName: "arrow.up") }
+                .buttonStyle(.borderless).help("Up one directory").accessibilityLabel("Up one directory")
+            Image(systemName: "folder").foregroundColor(.secondary).accessibilityHidden(true)
+            Text(pane.path).font(.caption.monospaced()).lineLimit(1).truncationMode(.head)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button { pinCurrent() } label: { Image(systemName: "bookmark") }
+                .buttonStyle(.borderless).help("Pin this folder as a shortcut")
+                .accessibilityLabel("Pin this folder as a shortcut")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(currentDirHighlighted ? Color.accentColor.opacity(0.18) : Color.clear)
+        .contentShape(Rectangle())
+        .dropDestination(for: String.self) { items, _ in
+            handleDrop(items, into: pane.path)
+        } isTargeted: { dropTargetPath = $0 ? pane.path : (dropTargetPath == pane.path ? nil : dropTargetPath) }
+        .help("Drop here to transfer into this folder")
+    }
+
+    private var content: some View {
+        ZStack {
+            if let error = pane.error {
+                paneMessage(icon: "exclamationmark.triangle", title: error,
+                            detail: "Check the machine is reachable, then Reload.")
+            } else if pane.entries.isEmpty && !pane.loading {
+                paneMessage(icon: "tray", title: "Empty folder", detail: nil)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(pane.entries) { entry in
+                            FileRowView(entry: entry, machine: pane.machine?.label ?? "",
+                                        isDropTarget: dropTargetPath == entry.path,
+                                        onOpen: { pane.enter(entry) },
+                                        onDrop: { items in handleDrop(items, into: entry.path) },
+                                        onHover: { hovering in
+                                            dropTargetPath = hovering ? entry.path
+                                                : (dropTargetPath == entry.path ? nil : dropTargetPath)
+                                        },
+                                        onMakeChicklet: { makeChicklet(entry) })
+                            Divider().opacity(0.4)
+                        }
+                    }
+                }
+            }
+            if pane.loading {
+                ProgressView().controlSize(.small)
+                    .padding(8).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func paneMessage(icon: String, title: String, detail: String?) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 30)).foregroundColor(.secondary).accessibilityHidden(true)
+            Text(title).font(.callout).multilineTextAlignment(.center)
+            if let detail { Text(detail).font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center) }
+        }
+        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var currentDirHighlighted: Bool { dropTargetPath == pane.path }
+
+    // MARK: actions
+
+    private func handleDrop(_ items: [String], into destPath: String) -> Bool {
+        guard let payload = items.first.flatMap(decodePayload), let m = pane.machine else { return false }
+        onDropInto(payload, m.label, destPath)
+        return true
+    }
+
+    private func jump(_ c: Chicklet) {
+        guard let m = pane.machines.first(where: { $0.label == c.machine }) else { return }
+        pane.jump(machine: m, path: c.path)
+    }
+
+    private func pinCurrent() {
+        guard let m = pane.machine else { return }
+        let name = (pane.path as NSString).lastPathComponent
+        chicklets.add(label: name.isEmpty ? m.label : name, machine: m.label, path: pane.path)
+    }
+
+    private func makeChicklet(_ entry: DirEntry) {
+        guard let m = pane.machine else { return }
+        chicklets.add(label: entry.name, machine: m.label, path: entry.path)
+    }
+}
+
+// MARK: One row
+
+struct FileRowView: View {
+    let entry: DirEntry
+    let machine: String
+    let isDropTarget: Bool
+    let onOpen: () -> Void
+    let onDrop: ([String]) -> Bool
+    let onHover: (Bool) -> Void
+    let onMakeChicklet: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "doc.on.doc").foregroundColor(.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.title).font(.callout).lineLimit(1).truncationMode(.middle)
-                Text(subtitle).font(.caption2).foregroundColor(.secondary)
-            }
+            Image(systemName: entry.isDir ? "folder.fill" : "doc")
+                .foregroundColor(entry.isDir ? .accentColor : .secondary)
+                .frame(width: 18).accessibilityHidden(true)
+            Text(entry.name).font(.callout).lineLimit(1).truncationMode(.middle)
             Spacer()
-            Image(systemName: "line.3.horizontal").foregroundColor(.secondary.opacity(0.6))
-                .accessibilityHidden(true)
+            if let s = entry.size, !entry.isDir {
+                Text(ByteCountFormatter.string(fromByteCount: s, countStyle: .file))
+                    .font(.caption2).foregroundColor(.secondary)
+            } else if entry.isDir {
+                Image(systemName: "chevron.right").font(.caption2).foregroundColor(.secondary.opacity(0.5))
+                    .accessibilityHidden(true)
+            }
         }
-        .padding(.vertical, 2)
-        .help("Drag onto a machine to transfer")
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(isDropTarget ? Color.accentColor.opacity(0.22) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { if entry.isDir { onOpen() } }
+        .draggable(encodePayload(TransferDragPayload(
+            machine: machine, path: entry.path, name: entry.name, isDir: entry.isDir, size: entry.size)))
+        .modifier(FolderDrop(enabled: entry.isDir, onDrop: onDrop, onHover: onHover))
+        .contextMenu {
+            if entry.isDir {
+                Button { onOpen() } label: { Label("Open", systemImage: "arrow.right.circle") }
+                Button { onMakeChicklet() } label: { Label("Make chicklet", systemImage: "bookmark") }
+            }
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.title), \(subtitle). Drag onto a machine to transfer.")
+        .accessibilityLabel(rowLabel)
     }
 
-    private var subtitle: String {
-        var parts: [String] = []
-        if !item.src.isEmpty { parts.append("on \(item.src)") }
-        if let s = TransferFormat.summary(files: item.files, bytes: item.bytes) { parts.append(s) }
-        return parts.joined(separator: " · ")
+    private var rowLabel: String {
+        var s = entry.isDir ? "Folder \(entry.name)" : "File \(entry.name)"
+        if let sz = entry.size, !entry.isDir { s += ", \(ByteCountFormatter.string(fromByteCount: sz, countStyle: .file))" }
+        s += entry.isDir ? ". Double-click to open, drag to transfer, or drop here." : ". Drag to transfer."
+        return s
+    }
+}
+
+/// Apply a drop destination only to folder rows.
+private struct FolderDrop: ViewModifier {
+    let enabled: Bool
+    let onDrop: ([String]) -> Bool
+    let onHover: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.dropDestination(for: String.self) { items, _ in onDrop(items) } isTargeted: { onHover($0) }
+        } else {
+            content
+        }
     }
 }
 
@@ -208,66 +392,56 @@ struct TransferItemRow: View {
 
 struct TransferConfirmSheet: View {
     @ObservedObject var actions: TransferActionsModel
-    let item: TransferItem
-    let dst: String
+    let payload: TransferDragPayload
+    let destMachine: String
+    let destPath: String
     let dismiss: () -> Void
-
-    @State private var exact: TransferDescription?
-
-    private var sameMachine: Bool { item.src == dst }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Transfer this title?").font(.headline)
+            Text("Transfer this \(payload.isDir ? "folder" : "file")?").font(.headline)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title).font(.title3.bold()).lineLimit(2).truncationMode(.middle)
-                Label("\(item.src.isEmpty ? "?" : item.src)  →  \(dst)", systemImage: "arrow.right")
-                    .font(.callout).foregroundColor(.secondary)
-                Text(countLine).font(.callout)
+            VStack(alignment: .leading, spacing: 6) {
+                Label(payload.name, systemImage: payload.isDir ? "folder.fill" : "doc")
+                    .font(.title3.bold()).lineLimit(2).truncationMode(.middle)
+                routeRow("From", "\(payload.machine):\((payload.path as NSString).deletingLastPathComponent)")
+                routeRow("Into", "\(destMachine):\(destPath)")
+                if let s = payload.size, !payload.isDir {
+                    Text(ByteCountFormatter.string(fromByteCount: s, countStyle: .file)).font(.callout)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
 
-            if sameMachine {
-                Label("This title is already on \(dst).", systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundColor(.orange)
-            }
-
             HStack {
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
                 if actions.supports(.move) {
-                    Button {
-                        actions.start(title: item.title, src: item.src, dst: dst, mode: .move); dismiss()
-                    } label: { Label("Move", systemImage: "arrow.right.to.line") }
-                        .disabled(sameMachine)
-                        .help("Copy to \(dst), then delete the original on \(item.src)")
+                    Button { launch(.move) } label: { Label("Move", systemImage: "arrow.right.to.line") }
+                        .help("Copy to \(destMachine), then delete the original after it verifies")
                 }
-                Button {
-                    actions.start(title: item.title, src: item.src, dst: dst, mode: .copy); dismiss()
-                } label: { Label("Copy", systemImage: "doc.on.doc") }
+                Button { launch(.copy) } label: { Label("Copy", systemImage: "doc.on.doc") }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(sameMachine)
-                    .help("Copy to \(dst), leaving the original in place")
+                    .help("Copy to \(destMachine), leaving the original in place")
             }
         }
-        .padding(18)
-        .frame(width: 420)
-        .task {
-            exact = await actions.describe(title: item.title, src: item.src)
+        .padding(18).frame(width: 480)
+    }
+
+    private func routeRow(_ k: String, _ v: String) -> some View {
+        HStack(spacing: 6) {
+            Text(k).font(.caption).foregroundColor(.secondary).frame(width: 36, alignment: .leading)
+            Text(v).font(.caption.monospaced()).foregroundColor(.secondary)
+                .lineLimit(1).truncationMode(.head)
         }
     }
 
-    /// Prefer an exact files/folders breakdown when a describeCommand supplied
-    /// one; otherwise the counts the dragged history row already carried.
-    private var countLine: String {
-        if let e = exact, let detail = TransferFormat.exact(files: e.files, folders: e.folders) {
-            return detail
-        }
-        return TransferFormat.summary(files: item.files, bytes: item.bytes) ?? "size unknown"
+    private func launch(_ mode: TransferMode) {
+        let dst = destPath.hasSuffix("/") ? destPath : destPath + "/"
+        actions.startTransfer(name: payload.name, srcMachine: payload.machine, srcPath: payload.path,
+                              dstMachine: destMachine, dstPath: dst, mode: mode)
+        dismiss()
     }
 }
 
@@ -277,9 +451,7 @@ struct TransferLogsView: View {
     @ObservedObject var actions: TransferActionsModel
     @State private var selection: String?
 
-    private var selectedOp: TransferOperation? {
-        actions.operations.first { $0.id == selection }
-    }
+    private var selectedOp: TransferOperation? { actions.operations.first { $0.id == selection } }
 
     private var hasFinished: Bool {
         actions.operations.contains { $0.state == .succeeded || $0.state == .failed || $0.state == .stopped }
@@ -298,8 +470,7 @@ struct TransferLogsView: View {
                 Divider()
             }
             HSplitView {
-                opList
-                    .frame(minWidth: 240, idealWidth: 280)
+                opList.frame(minWidth: 240, idealWidth: 280)
                 if let op = selectedOp {
                     LogTailView(op: op, actions: actions)
                         .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
@@ -321,7 +492,7 @@ struct TransferLogsView: View {
             if actions.operations.isEmpty {
                 VStack(spacing: 6) {
                     Text("No transfers launched yet").font(.headline)
-                    Text("Drag a title onto a machine in the Transfer tab to start one.")
+                    Text("Drag a file from one pane onto a folder in the other to start one.")
                         .font(.caption).foregroundColor(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 240)
                 }
@@ -333,11 +504,10 @@ struct TransferLogsView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(op.title).font(.callout).lineLimit(1).truncationMode(.middle)
                             Text("\(op.mode.rawValue) · \(op.routeText)")
-                                .font(.caption2).foregroundColor(.secondary)
+                                .font(.caption2).foregroundColor(.secondary).lineLimit(1).truncationMode(.middle)
                             if op.state == .retrying, let at = op.nextRetryAt {
                                 HStack(spacing: 3) {
-                                    Text("retry in")
-                                    Text(at, style: .timer).monospacedDigit()
+                                    Text("retry in"); Text(at, style: .timer).monospacedDigit()
                                     Text("· attempt \(op.attempt)/\(op.maxAttempts)")
                                 }
                                 .font(.caption2).foregroundColor(.orange)
@@ -421,11 +591,10 @@ struct LogTailView: View {
                 }
                 Spacer()
                 controls
-                Button {
-                    NSWorkspace.shared.selectFile(op.logPath, inFileViewerRootedAtPath: "")
-                } label: { Label("Reveal Log", systemImage: "folder") }
-                    .buttonStyle(.borderless).font(.caption)
-                    .help(op.logPath)
+                Button { NSWorkspace.shared.selectFile(op.logPath, inFileViewerRootedAtPath: "") } label: {
+                    Label("Reveal Log", systemImage: "folder")
+                }
+                .buttonStyle(.borderless).font(.caption).help(op.logPath)
             }
             .padding(8)
             Divider()
@@ -457,49 +626,18 @@ struct LogTailView: View {
         switch op.state {
         case .retrying:
             if let at = op.nextRetryAt {
-                HStack(spacing: 3) {
-                    Text("retry in"); Text(at, style: .timer).monospacedDigit()
-                }
-                .font(.caption2).foregroundColor(.orange)
+                HStack(spacing: 3) { Text("retry in"); Text(at, style: .timer).monospacedDigit() }
+                    .font(.caption2).foregroundColor(.orange)
             }
             Button { actions.retryNow(op.id) } label: { Label("Retry Now", systemImage: "bolt.fill") }
-                .buttonStyle(.borderless).font(.caption)
-                .accessibilityLabel("Retry now, skipping the backoff wait")
+                .buttonStyle(.borderless).font(.caption).accessibilityLabel("Retry now, skipping the backoff wait")
             Button { actions.stop(op.id) } label: { Label("Stop", systemImage: "stop.fill") }
-                .buttonStyle(.borderless).font(.caption).foregroundColor(.red)
-                .accessibilityLabel("Stop retrying")
+                .buttonStyle(.borderless).font(.caption).foregroundColor(.red).accessibilityLabel("Stop retrying")
         case .failed, .stopped:
             Button { actions.retry(op.id) } label: { Label("Retry", systemImage: "arrow.clockwise") }
-                .buttonStyle(.borderless).font(.caption)
-                .accessibilityLabel("Retry from the first attempt")
+                .buttonStyle(.borderless).font(.caption).accessibilityLabel("Retry from the first attempt")
         default:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - formatting
-
-enum TransferFormat {
-    private static let count: NumberFormatter = {
-        let f = NumberFormatter(); f.numberStyle = .decimal; return f
-    }()
-
-    static func summary(files: Int?, bytes: Int64?) -> String? {
-        var parts: [String] = []
-        if let f = files, f > 0 { parts.append("\(count.string(from: NSNumber(value: f)) ?? "\(f)") files") }
-        if let b = bytes, b > 0 { parts.append(ByteCountFormatter.string(fromByteCount: b, countStyle: .file)) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    static func exact(files: Int?, folders: Int?) -> String? {
-        let f = files ?? 0, d = folders ?? 0
-        if files == nil && folders == nil { return nil }
-        switch (f, d) {
-        case (0, 0): return "empty"
-        case (_, 0): return "\(f) file\(f == 1 ? "" : "s")"
-        case (0, _): return "\(d) folder\(d == 1 ? "" : "s")"
-        default:     return "\(f) file\(f == 1 ? "" : "s") and \(d) folder\(d == 1 ? "" : "s")"
         }
     }
 }

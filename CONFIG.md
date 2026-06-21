@@ -55,22 +55,22 @@ Schema (`config/transfers.example.json`):
 | `sources[].label` | machine label shown on each transfer row |
 | `sources[].command` | argv that prints the queue JSON (run via a login shell); for a remote machine prefix with `ssh <host> nice -n 19 …` |
 | `sources[].runCommand` | optional argv that reprocesses failed/pending transfers; when set, failed rows show a one-click **Resume** that runs it detached (survives the menu closing). Omit to keep the source read-only. |
-| `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **Transfer History** window (opened from the dropdown). Omit to leave that window unconfigured. |
+| `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **History** tab in the **Manager** window (opened from the dropdown). Omit to leave it unconfigured. |
 | `history.clearCommand` | optional argv that prunes the history log (e.g. drop FAILED entries); enables a **Clean** button in the History tab. Omit to leave history read-only |
-| `transfer.machines` | optional list of machine labels shown as drop targets in the **Transfer** tab; if omitted, derived from the machines seen in history |
-| `transfer.copyCommand` | argv that copies a title to a machine, with `{title}`/`{src}`/`{dst}` placeholders the app fills in (substituted per-element, never into a shell string). Enables the Transfer tab's **Copy** action |
-| `transfer.moveCommand` | optional argv (same placeholders) for a destructive **Move** (copy then delete the source). The Move button stays disabled until this is set |
-| `transfer.describeCommand` | optional argv (same placeholders) printing `{"files":N,"folders":M}` so the confirm dialog shows an exact "X files and Y folders"; omitted → it uses the file count + size from the dragged history row |
-| `transfer.logDir` | optional directory for per-operation logs (default `~/.config/server-monitor/transfer-logs`) |
-| `transfer.maxAttempts` | optional total tries (incl. the first) before a launched transfer gives up (default 5, min 1) |
-| `transfer.backoffBaseSeconds` | optional first-retry delay; doubles each attempt — 2, 4, 8, 16 … (default 2) |
+| `manager.machines` | machines shown in each pane's switcher. Each entry: `label`, optional `local: true` (browse via the local filesystem), `ssh: "user@host"` (browse a remote machine via `ssh ls`), and `start` (initial directory) |
+| `manager.transferCommand` | argv that performs a transfer, with `{mode}`/`{srcMachine}`/`{srcPath}`/`{dstMachine}`/`{dstPath}` placeholders the app fills in (substituted per-element, never into a shell string). Enables the **Files** tab's drag-to-transfer |
+| `manager.moveEnabled` | when `true`, the drop dialog offers **Move** (copy then delete the source) next to **Copy**. Defaults to Copy-only |
+| `manager.chickletsPath` | optional JSON file persisting the pinned **chicklet** shortcuts (machine + path) shown above both panes |
+| `manager.logDir` | optional directory for per-operation logs (default `~/.config/server-monitor/transfer-logs`) |
+| `manager.maxAttempts` | optional total tries (incl. the first) before a launched transfer gives up (default 5, min 1) |
+| `manager.backoffBaseSeconds` | optional first-retry delay; doubles each attempt: 2, 4, 8, 16 (default 2) |
 
 The command must print JSON shaped like
 `{ "queue": [ { "id","source","dest","status","mode","bytesTransferred","bytesTotal","filesDone","filesTotal","rateBytesPerSec","currentFile" } ], "summary": { "running","pending","failed" } }`
 — **raw byte counters**; the panel computes % and ETA itself. With no
 `transfers.json`, the Transfers panel is inert.
 
-The **Transfer History** window reads `history.command`, which must print **one
+The Manager window's **History** tab reads `history.command`, which must print **one
 JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",
 "targetMachine","startTime","endTime","status","filesTransferred","bytesTransferred","errors" }`.
 Only `id`/`startTime`/`status` are required; the rest degrade gracefully. The
@@ -79,20 +79,22 @@ newest-first, with click-to-drill detail. It also carries **Inventory** and
 **Reclaim** tabs that activate once the tool exposes those as JSON (Reclaim is
 read-only / dry-run only — the app never deletes).
 
-With a `transfer` block configured, the window also gains a **Transfer** tab and a
-**Logs** tab. In Transfer, drag a title onto a machine chip; a confirm dialog shows
-the title, the `src → dst` route, and how much is moving (file count + size from the
-dragged history row, or an exact files/folders breakdown when `describeCommand` is
-set), with **Copy**, **Move** (only if `moveCommand` is set), and **Cancel**. Each
-launched transfer streams its combined output to a per-operation log under
-`transfer.logDir`; the **Logs** tab live-tails the selected operation so you can
-watch the low-level work and inspect failures. A failed transfer **retries with
-exponential backoff** (2, 4, 8, 16 … seconds) up to `transfer.maxAttempts` and then
-stops — it can never become a runaway loop — and you can **Retry Now** (skip the
-wait), **Stop** (abandon it), or **Retry** a finished one from the Logs tab.
-Use **Clean** in the History tab (when `history.clearCommand` is set) to prune the
-log. The app only ever runs the argv you configure — no host names or tool specifics
-live in this repo.
+With a `manager` block configured, the window's **Files** tab is a dual-pane browser.
+Each pane lists a chosen machine's directory (locally, or via `ssh ls` for a remote)
+and you navigate by double-clicking folders or the up button. **Drag a row from one
+pane onto a folder (or the path bar) of the other** to transfer it *into that exact
+directory*; a dialog shows the source, the `from → into` route, and **Copy**, **Move**
+(only when `moveEnabled`), and **Cancel**. **Chicklets** are pinned root shortcuts
+shown identically above both panes: right-click a folder (or use the path-bar bookmark)
+to make one, click it to send a pane straight there, persisted to `chickletsPath`.
+
+Each launched transfer streams its combined output to a per-operation log under
+`manager.logDir`; the **Logs** tab live-tails the selected one so you can watch the
+low-level commands and inspect failures. A failed transfer **retries with exponential
+backoff** (2, 4, 8, 16 seconds) up to `manager.maxAttempts` and then stops, so it can
+never become a runaway loop, and you can **Retry Now**, **Stop**, or **Retry** a
+finished one. The app only ever runs the argv you configure (plus a generic `ls`
+against an ssh target you supply): no host names or tool specifics live in this repo.
 
 ## Protection config
 

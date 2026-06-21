@@ -41,7 +41,7 @@ struct ServerMonitorApp: App {
                     Button {
                         openWindow(id: "transfer-history")
                     } label: {
-                        Label("Transfer History…", systemImage: "clock.arrow.circlepath")
+                        Label("Manager…", systemImage: "rectangle.split.2x1")
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
@@ -85,9 +85,9 @@ struct ServerMonitorApp: App {
         .windowResizability(.contentSize)
         .defaultSize(width: 500, height: 400)
 
-        WindowGroup("Transfer History", id: "transfer-history") {
+        WindowGroup("Manager", id: "transfer-history") {
             TransferHistoryWindow()
         }
-        .defaultSize(width: 840, height: 560)
+        .defaultSize(width: 920, height: 600)
     }
 }

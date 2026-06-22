@@ -12,7 +12,7 @@ struct DarkmeshStatus: Codable, Equatable {
     let internetOk: Bool
     let dnsOk: Bool
     let tailscaleOk: Bool
-    let verdict: String           // "GO" | "DEGRADED" | "NO-GO" | "IDLE"
+    let verdict: String           // GO | DEGRADED | NO-GO | OFF | CAPTIVE | PENDING
     let autoDisconnected: Bool
     let autoDisconnectReason: String
     let autoDisconnectAt: String
@@ -24,6 +24,13 @@ struct DarkmeshStatus: Codable, Equatable {
     let servicesOk: Bool?
     let reconnect: Reconnect?
     let pf: PFState?
+    let inetE2EOk: Bool?
+    let inetIpOk: Bool?
+    let crdRequired: Bool?
+    let crdOk: Bool?
+    let crdReason: String?
+    let dnsOverrideActive: Bool?
+    let breakers: [String: Breaker]?
 
     enum CodingKeys: String, CodingKey {
         case timestamp
@@ -40,6 +47,13 @@ struct DarkmeshStatus: Codable, Equatable {
         case servicesOk              = "services_ok"
         case reconnect
         case pf
+        case inetE2EOk             = "inet_e2e_ok"
+        case inetIpOk              = "inet_ip_ok"
+        case crdRequired           = "crd_required"
+        case crdOk                 = "crd_ok"
+        case crdReason             = "crd_reason"
+        case dnsOverrideActive     = "dns_override_active"
+        case breakers
     }
 
     /// Recovery snapshot authored by the reconnect watchdog and merged into the
@@ -83,6 +97,24 @@ struct DarkmeshStatus: Codable, Equatable {
         }
     }
 
+    struct Breaker: Codable, Equatable {
+        let state: String?
+        let rung: Int?
+        let cycles: Int?
+        let openedAt: Int?
+        let gaveUp: Bool?
+        let lastAction: String?
+
+        enum CodingKeys: String, CodingKey {
+            case state
+            case rung
+            case cycles
+            case openedAt  = "opened_at"
+            case gaveUp    = "gave_up"
+            case lastAction = "last_action"
+        }
+    }
+
     /// False only when the status explicitly reports a keep-alive service down.
     var servicesHealthy: Bool { servicesOk ?? true }
 
@@ -90,13 +122,17 @@ struct DarkmeshStatus: Codable, Equatable {
     /// nil when the status file predates the PF field (tolerate-or-warn).
     var pfKillSwitchWired: Bool? { pf?.pfAnchorEvaluated }
 
+    var gaveUpFaults: [String] {
+        breakers?.compactMap { key, value in value.gaveUp == true ? key : nil }.sorted() ?? []
+    }
+
     /// Color cue for the menu-bar status row.
     var verdictColor: Color {
         switch verdict {
         case "GO":       return .green
-        case "DEGRADED": return .yellow
         case "NO-GO":    return .red
-        case "IDLE":     return .secondary
+        case "DEGRADED", "PENDING", "CAPTIVE": return .yellow
+        case "OFF", "IDLE": return .secondary
         default:         return .gray
         }
     }
@@ -105,9 +141,9 @@ struct DarkmeshStatus: Codable, Equatable {
     var verdictEmoji: String {
         switch verdict {
         case "GO":       return "🟢"
-        case "DEGRADED": return "🟡"
         case "NO-GO":    return "🔴"
-        case "IDLE":     return "⚪️"
+        case "DEGRADED", "PENDING", "CAPTIVE": return "🟡"
+        case "OFF", "IDLE": return "⚪️"
         default:         return "❔"
         }
     }

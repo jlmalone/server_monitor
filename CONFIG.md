@@ -132,6 +132,11 @@ stack is missing/stale (e.g. darkmesh's `darkmesh-audit`), plus a binding check
 menu-bar dot **off green** via the existing combined tint — so "green requires every
 keep-alive service running" needs no app code, just these checks.
 
+For darkmesh schema 3, use its composite `darkmesh-audit` check and
+`darkmesh-repair` repair command. The audit also fails when a persistent recovery
+breaker gives up, while the VPN panel displays the affected fault and any active
+temporary DNS recovery override.
+
 ## Why these live outside git
 
 These files carry **per-machine paths and operational specifics** that are

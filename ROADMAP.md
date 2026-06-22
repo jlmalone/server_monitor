@@ -10,8 +10,9 @@ reads their output/exit codes; it owns no policy and stores no host or tool name
 
 A compact status row that mirrors a local network-protection status file
 (`/tmp/darkmesh-status.json`) written by a separate per-machine helper: a verdict
-(GO / DEGRADED / NO-GO / IDLE) plus VPN / Internet / DNS / Tailscale probes and a
-last-auto-disconnect footnote. The app only *reads* the file.
+plus VPN / raw-IP / open-internet / DNS / Tailscale / optional remote-access probes,
+temporary DNS recovery state, per-fault circuit breakers, and a last-auto-disconnect
+footnote. The app only *reads* the file.
 
 Follow-ups (kept generic):
 - **Decode hardening** *(next)*: render "—/unknown" instead of a raw decode error
@@ -22,7 +23,8 @@ Follow-ups (kept generic):
   user-provided control binary whose path comes from local config.
 - **Cannibalise + retire the darkmesh SwiftBar plugin** (lockstep with
   `darkmesh-vpn-guard/ROADMAP.md`): port the plugin's actions into this panel and
-  surface the status-schema-2 fields (already decoded in `DarkmeshStatus.swift`).
+  surface the remaining status details. Schema 3 probe/breaker/override fields are
+  decoded and rendered; `desired`, `services_ok`, and reconnect details remain.
   Each action just shells a documented helper. Once at parity, the plugin is
   deleted there.
 

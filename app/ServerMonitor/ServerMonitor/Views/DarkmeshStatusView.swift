@@ -16,6 +16,7 @@ struct DarkmeshStatusView: View {
 
             if let s = monitor.status {
                 probeGrid(s)
+                recoveryState(s)
                 if s.autoDisconnected || !s.autoDisconnectAt.isEmpty {
                     autoDisconnectFootnote(s)
                 }
@@ -61,17 +62,27 @@ struct DarkmeshStatusView: View {
     private func probeGrid(_ s: DarkmeshStatus) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             probeRow("VPN", value: s.vpnState, ok: s.vpnState == "Connected")
-            probeRow("Internet",   value: s.internetOk ? "reachable" : "unreachable",   ok: s.internetOk)
+            let e2e = s.inetE2EOk ?? s.internetOk
+            probeRow("Open internet", value: e2e ? "reachable" : "unreachable", ok: e2e)
+            if let rawIP = s.inetIpOk {
+                probeRow("Raw IP", value: rawIP ? "reachable" : "unreachable", ok: rawIP)
+            }
             probeRow("DNS",        value: s.dnsOk ? "resolves" : "broken",              ok: s.dnsOk)
             probeRow("Tailscale",  value: s.tailscaleOk ? "DERP ok" : "unreachable",    ok: s.tailscaleOk)
+            if s.crdRequired == true {
+                probeRow("Remote access", value: s.crdOk == true ? "reachable" : (s.crdReason ?? "unreachable"),
+                         ok: s.crdOk == true)
+            } else if s.crdRequired == false {
+                probeRow("Remote access", value: "not required", ok: nil)
+            }
         }
     }
 
     @ViewBuilder
-    private func probeRow(_ label: String, value: String, ok: Bool) -> some View {
+    private func probeRow(_ label: String, value: String, ok: Bool?) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(ok ? Color.green : Color.red)
+                .fill(ok.map { $0 ? Color.green : Color.red } ?? Color.secondary)
                 .frame(width: 7, height: 7)
             Text(label)
                 .font(.caption)
@@ -80,6 +91,19 @@ struct DarkmeshStatusView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func recoveryState(_ s: DarkmeshStatus) -> some View {
+        if !s.gaveUpFaults.isEmpty {
+            Text("Recovery stopped: \(s.gaveUpFaults.joined(separator: ", "))")
+                .font(.caption2.bold())
+                .foregroundColor(.red)
+        } else if s.dnsOverrideActive == true {
+            Text("Temporary DNS recovery active")
+                .font(.caption2)
+                .foregroundColor(.orange)
         }
     }
 

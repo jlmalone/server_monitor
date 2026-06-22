@@ -55,11 +55,20 @@ from a queue CLI's `--json` output named in untracked
 when a reprocess command is configured. Raw byte counters in; the panel derives
 %/ETA.
 
-## Transfer History + Transfer + Logs + Inventory + Reclaim window — History/Transfer/Logs shipped
+## Active + Transfer History + Transfer + Logs + Inventory + Reclaim window — History/Transfer/Logs shipped
 
-A secondary **window** (opened from the dropdown) for the file-transfer tool's
-records — distinct from the live queue:
+A secondary **window** (opened from the dropdown) for the file-transfer tool's live
+queue and records:
 
+- **Active** *(roadmap)*: the full live view of the transfer queue inside the window,
+  the triage counterpart to the compact dropdown Transfers panel. Lists every item
+  that is running, pending, stalled, failed, or paused (read from the queue CLI's
+  `--json`), each row with: **Resume** a failed / stalled / paused item (configured
+  reprocess/reset argv), **Stop** a running or pending one (cancel argv), and
+  **Delete**, which only enables after a Stop and asks for confirmation, removing the
+  queue entry, not the transferred files (the menu bar still never deletes data). All
+  actions run configured argv from untracked `transfers.json`, the same generic
+  pattern as every other panel.
 - **History** *(shipped)*: browse past sync operations from the tool's history
   log (timestamp, repositories, route, status, files, bytes, errors), newest first,
   with search + status filter (defaults to **Failed** for triage) and click-to-drill

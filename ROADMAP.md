@@ -85,6 +85,14 @@ records — distinct from the live queue:
   and how much space — **read-only / dry-run only in the app**. Destructive reclaim
   stays a deliberate CLI action with live re-verification; the menu bar never deletes.
 
+Window UX follow-ups:
+- **Single-instance + foreground**: opening the Manager when it is already open
+  raises and focuses the existing window instead of spawning a second, and brings it
+  to the front on every open (exactly one Manager window, frontmost when invoked).
+- **Finder-style multi-select**: shift/cmd-click to select multiple files and folders
+  in a pane and drag the whole selection onto a destination chip in a single drop
+  (today each drag carries one item).
+
 Consumer requirements for the transfer tool (stable versioned JSON schemas, `--json`
 on every queryable command, per-item "why-not-reclaimable" reasons, and a 0/nonzero
 exit-code contract) are tracked in that tool's own roadmap.

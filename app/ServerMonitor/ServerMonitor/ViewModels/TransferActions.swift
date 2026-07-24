@@ -269,6 +269,16 @@ final class TransferActionsModel: ObservableObject {
         self.backoffBase = max(0.5, cfg?.backoffBaseSeconds ?? 2)
     }
 
+    var activeCount: Int {
+        operations.count { $0.state == .running || $0.state == .retrying }
+    }
+
+    var failedCount: Int {
+        operations.count { $0.state == .failed }
+    }
+
+    var needsAttention: Bool { failedCount > 0 }
+
     /// True when `mode` is available (Copy always; Move only if enabled).
     func supports(_ mode: TransferMode) -> Bool { mode == .copy || canMove }
 

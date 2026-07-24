@@ -7,6 +7,7 @@ struct ServerMonitorApp: App {
     @StateObject private var worker = WorkerStatusMonitor()
     @StateObject private var lidSleep = LidSleepMonitor()
     @StateObject private var transfers = TransfersMonitor()
+    @StateObject private var transferActions = TransferActionsModel()
     @StateObject private var protection = ProtectionMonitor()
     @StateObject private var versions = VersionMonitor()
     @StateObject private var backgroundService = BackgroundServiceManager()
@@ -25,6 +26,7 @@ struct ServerMonitorApp: App {
         if darkmesh.status?.transferGateBlocked == true { return .yellow }
         if protection.atRisk { return .yellow }   // a fail-closed guard is down — never show "all good"
         if transfers.needsAttention { return .yellow } // failed work or stale monitoring needs attention
+        if transferActions.needsAttention { return .yellow }
         if darkmesh.status?.verdict == "GO" { return monitor.overallStatus.color }
         return .yellow   // no GO verdict (VPN off / IDLE / status missing): not protected
     }
@@ -40,7 +42,7 @@ struct ServerMonitorApp: App {
                     LidSleepView(monitor: lidSleep)
                 }
                 Divider()
-                TransfersView(monitor: transfers)
+                TransfersView(monitor: transfers, actions: transferActions)
                 HStack {
                     Spacer()
                     Button {
@@ -94,7 +96,7 @@ struct ServerMonitorApp: App {
         .defaultSize(width: 500, height: 400)
 
         WindowGroup("Manager", id: "transfer-history") {
-            TransferHistoryWindow()
+            TransferHistoryWindow(actions: transferActions)
         }
         .defaultSize(width: 920, height: 600)
     }

@@ -19,6 +19,11 @@ Detailed integration notes are kept in an untracked local doc, not in this repo.
 See [docs/TRUSTED_MACHINE_CONTEXT.md](docs/TRUSTED_MACHINE_CONTEXT.md) for the
 supported private-context handoff.
 
+Manager-launched operations share one app-scoped model with the menu-bar
+Transfers panel. Running, retrying, and failed Manager work therefore remains
+visible after the Manager window closes; failures also downgrade the menu-bar
+tint until the finished operation is cleared.
+
 The **Lid Close** panel is fully generic and needs no config: on laptops it
 toggles `pmset disablesleep` so the Mac keeps running with the lid shut (read is
 unprivileged; the change goes through the native admin prompt — no helper daemon or

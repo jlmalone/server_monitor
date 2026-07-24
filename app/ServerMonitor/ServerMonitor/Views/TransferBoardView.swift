@@ -105,13 +105,15 @@ final class PaneModel: ObservableObject {
 
 struct ManagerView: View {
     @ObservedObject var actions: TransferActionsModel
+    let showLogs: () -> Void
     @StateObject private var chicklets: ChickletStore
     @StateObject private var left: PaneModel
     @StateObject private var right: PaneModel
     @State private var pending: PendingTransfer?
 
-    init(actions: TransferActionsModel) {
+    init(actions: TransferActionsModel, showLogs: @escaping () -> Void = {}) {
         _actions = ObservedObject(wrappedValue: actions)
+        self.showLogs = showLogs
         _chicklets = StateObject(wrappedValue: ChickletStore(path: actions.chickletsPath))
         let ms = actions.machines
         _left = StateObject(wrappedValue: PaneModel(machine: ms.first, machines: ms))
@@ -121,13 +123,19 @@ struct ManagerView: View {
     var body: some View {
         Group {
             if actions.configured {
-                HSplitView {
-                    FilePaneView(pane: left, chicklets: chicklets, actions: actions,
-                                 onDropInto: requestTransfer)
-                        .frame(minWidth: 320)
-                    FilePaneView(pane: right, chicklets: chicklets, actions: actions,
-                                 onDropInto: requestTransfer)
-                        .frame(minWidth: 320)
+                VStack(spacing: 0) {
+                    if let operation = actions.operations.first {
+                        latestOperation(operation)
+                        Divider()
+                    }
+                    HSplitView {
+                        FilePaneView(pane: left, chicklets: chicklets, actions: actions,
+                                     onDropInto: requestTransfer)
+                            .frame(minWidth: 320)
+                        FilePaneView(pane: right, chicklets: chicklets, actions: actions,
+                                     onDropInto: requestTransfer)
+                            .frame(minWidth: 320)
+                    }
                 }
             } else {
                 placeholder
@@ -136,6 +144,39 @@ struct ManagerView: View {
         .sheet(item: $pending) { p in
             TransferConfirmSheet(actions: actions, payload: p.payload,
                                  destMachine: p.destMachine, destPath: p.destPath) { pending = nil }
+        }
+    }
+
+    private func latestOperation(_ operation: TransferOperation) -> some View {
+        HStack(spacing: 8) {
+            TransferStateDot(state: operation.state)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(operation.title).font(.callout.bold()).lineLimit(1).truncationMode(.middle)
+                Text(operationSummary(operation))
+                    .font(.caption2)
+                    .foregroundColor(operation.state == .failed ? .red : .secondary)
+            }
+            Spacer()
+            Button("View Log", action: showLogs)
+                .buttonStyle(.borderless)
+                .font(.caption)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
+    private func operationSummary(_ operation: TransferOperation) -> String {
+        switch operation.state {
+        case .running:
+            return "\(operation.mode.rawValue) attempt \(operation.attempt)/\(operation.maxAttempts) is running"
+        case .retrying:
+            return "Attempt \(operation.attempt)/\(operation.maxAttempts) failed; waiting to retry"
+        case .succeeded:
+            return "\(operation.mode.rawValue) completed successfully"
+        case .failed:
+            return "\(operation.mode.rawValue) failed after \(operation.attempt) attempts"
+        case .stopped:
+            return "\(operation.mode.rawValue) stopped"
         }
     }
 

@@ -68,29 +68,58 @@ struct WorkerStatusView: View {
 /// this view is pure presentation. Inert when no `transfers.json` is configured.
 struct TransfersView: View {
     @ObservedObject var monitor: TransfersMonitor
+    @ObservedObject var actions: TransferActionsModel
+
+    private var managerOperations: [TransferOperation] {
+        actions.operations.filter {
+            $0.state == .running || $0.state == .retrying || $0.state == .failed
+        }
+    }
+    private var running: Int { monitor.running + actions.activeCount }
+    private var failed: Int { monitor.failed + actions.failedCount }
+
+    private var headline: String {
+        if !monitor.configured && managerOperations.isEmpty { return "not configured" }
+        var parts: [String] = []
+        if running > 0 { parts.append("\(running) running") }
+        if monitor.pending > 0 { parts.append("\(monitor.pending) pending") }
+        if failed > 0 { parts.append("\(failed) failed") }
+        if parts.isEmpty { return monitor.lastError ?? "no transfers" }
+        return parts.joined(separator: ", ")
+    }
+
+    private var headlineColor: Color {
+        if failed > 0 || monitor.lastError != nil { return .orange }
+        if running > 0 { return .green }
+        return .secondary
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Image(systemName: monitor.running > 0 ? "arrow.down.circle.fill" : "arrow.down.circle")
-                    .foregroundColor(monitor.headlineColor)
+                Image(systemName: running > 0 ? "arrow.down.circle.fill" : "arrow.down.circle")
+                    .foregroundColor(headlineColor)
                 Text("Transfers")
                     .font(.headline)
                 Spacer()
-                Text(monitor.headline)
+                Text(headline)
                     .font(.caption.bold())
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(monitor.headlineColor.opacity(0.2))
-                    .foregroundColor(monitor.headlineColor)
+                    .background(headlineColor.opacity(0.2))
+                    .foregroundColor(headlineColor)
                     .cornerRadius(4)
             }
 
-            if !monitor.configured {
+            ForEach(managerOperations.prefix(3)) { operation in
+                managerRow(operation)
+            }
+
+            if !monitor.configured && managerOperations.isEmpty {
                 Text("no transfers source configured")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-            } else if monitor.rows.isEmpty && monitor.lastError == nil {
+            } else if monitor.rows.isEmpty && monitor.lastError == nil && managerOperations.isEmpty {
                 Text("no active transfers")
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -116,6 +145,36 @@ struct TransfersView: View {
         // Repoll the moment the menu opens so the panel shows current progress, not
         // the last (up to a minute old) timer snapshot.
         .onAppear { monitor.refresh() }
+    }
+
+    @ViewBuilder
+    private func managerRow(_ operation: TransferOperation) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                TransferStateDot(state: operation.state)
+                Text(operation.title)
+                    .font(.caption.bold())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Text(managerStatus(operation))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(operation.state == .failed ? .orange : .secondary)
+            }
+            Text("\(operation.mode.rawValue) · Manager")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func managerStatus(_ operation: TransferOperation) -> String {
+        switch operation.state {
+        case .running: return "attempt \(operation.attempt)/\(operation.maxAttempts)"
+        case .retrying: return "retrying"
+        case .failed: return "failed"
+        case .succeeded: return "complete"
+        case .stopped: return "stopped"
+        }
     }
 
     @ViewBuilder
@@ -160,7 +219,7 @@ struct TransfersView: View {
 }
 
 #Preview {
-    TransfersView(monitor: TransfersMonitor())
+    TransfersView(monitor: TransfersMonitor(), actions: TransferActionsModel())
         .frame(width: 320)
 }
 
@@ -171,18 +230,22 @@ struct TransfersView: View {
 /// the tool exposes them as JSON (roadmap "Transfer History + Inventory + Reclaim
 /// window"). Reclaim is read-only/dry-run only by design — this window never deletes.
 struct TransferHistoryWindow: View {
-    @StateObject private var actions = TransferActionsModel()
+    @ObservedObject var actions: TransferActionsModel
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
-            ManagerView(actions: actions)
+        TabView(selection: $selectedTab) {
+            ManagerView(actions: actions, showLogs: { selectedTab = 2 })
                 .tabItem { Label("Files", systemImage: "rectangle.split.2x1") }
+                .tag(0)
 
             TransferHistoryTab()
                 .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+                .tag(1)
 
             TransferLogsView(actions: actions)
                 .tabItem { Label("Logs", systemImage: "doc.text.magnifyingglass") }
+                .tag(2)
 
             TransferToolStubTab(
                 title: "Inventory",
@@ -191,6 +254,7 @@ struct TransferHistoryWindow: View {
                 detail: "Activates once the transfer tool exposes inventory as JSON (roadmap Phase 16)."
             )
             .tabItem { Label("Inventory", systemImage: "shippingbox") }
+            .tag(3)
 
             TransferToolStubTab(
                 title: "Reclaim",
@@ -199,6 +263,7 @@ struct TransferHistoryWindow: View {
                 detail: "Destructive reclaim stays a deliberate CLI action with live re-verification; this window never deletes. Activates once the tool exposes reclaim as JSON (roadmap Phase 16)."
             )
             .tabItem { Label("Reclaim", systemImage: "trash.slash") }
+            .tag(4)
         }
         .frame(minWidth: 860, minHeight: 520)
     }

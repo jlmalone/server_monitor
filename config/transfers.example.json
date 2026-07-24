@@ -1,0 +1,33 @@
+{
+  "pollSeconds": 60,
+  "sources": [
+    {
+      "label": "this Mac",
+      "statusFile": "~/.your-transfer-tool/queue-status.json",
+      "healthFile": "~/.local/state/your-transfer-monitor/status.json",
+      "maxHealthAgeSeconds": 240,
+      "maxActiveSnapshotAgeSeconds": 30
+    },
+    {
+      "label": "remote",
+      "command": ["ssh", "remote.example", "your-transfer-cli", "queue", "--status", "--json"]
+    }
+  ],
+  "history": {
+    "command": ["your-transfer-cli", "history", "--json"],
+    "clearCommand": ["true"]
+  },
+  "manager": {
+    "machines": [
+      {"label": "this-mac", "local": true, "start": "/Users/you"},
+      {"label": "server", "ssh": "you@server.example", "start": "/srv/media"},
+      {"label": "nas", "ssh": "you@nas.example", "start": "/volume1"}
+    ],
+    "transferCommand": ["your-transfer-helper", "{mode}", "{srcMachine}", "{srcPath}", "{dstMachine}", "{dstPath}"],
+    "moveEnabled": true,
+    "logDir": "~/.config/server-monitor/transfer-logs",
+    "chickletsPath": "~/.config/server-monitor/manager-chicklets.json",
+    "maxAttempts": 5,
+    "backoffBaseSeconds": 2
+  }
+}

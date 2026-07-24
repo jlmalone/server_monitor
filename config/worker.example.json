@@ -1,0 +1,8 @@
+{
+  "repoDir": "/Users/you/path/to/worker-repo",
+  "script": "run.sh",
+  "arg": "local",
+  "pidPath": "/tmp/worker-local.pid",
+  "logPath": "/tmp/worker-local.log",
+  "ratePattern": "Rate: [0-9,]+/s"
+}

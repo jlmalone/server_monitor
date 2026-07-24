@@ -1,0 +1,39 @@
+{
+  "_comment": "One signed supervisor owns persistent helpers and scheduled one-shot jobs. Commands execute directly; use absolute paths. Keep machine-specific values in the untracked ~/.config copy.",
+  "schema": 1,
+  "statusFile": "~/Library/Application Support/ServerMonitor/infrastructure-agent-status.json",
+  "persistentChildren": [
+    {
+      "id": "network-safety",
+      "command": ["/absolute/path/to/network-safety", "--watch"],
+      "restartDelaySeconds": 10
+    },
+    {
+      "id": "network-recovery",
+      "command": ["/absolute/path/to/network-recovery"],
+      "restartDelaySeconds": 10,
+      "networkChangeSignal": "USR1"
+    }
+  ],
+  "scheduledJobs": [
+    {
+      "id": "fail-closed-reconcile",
+      "command": ["/absolute/path/to/fail-closed-reconcile"],
+      "intervalSeconds": 30,
+      "timeoutSeconds": 25,
+      "runAtStart": true
+    },
+    {
+      "id": "safe-queue-drain",
+      "command": ["/absolute/path/to/safe-queue-drain"],
+      "intervalSeconds": 90,
+      "timeoutSeconds": 86400,
+      "runAtStart": true
+    }
+  ],
+  "watchNetworkChanges": true,
+  "watchPaths": [
+    "/etc/resolv.conf",
+    "/var/run/resolv.conf"
+  ]
+}

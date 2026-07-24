@@ -1,0 +1,18 @@
+{
+  "_comment": "Optional Versions panel. Copy to ~/.config/server-monitor/versions.json and list the tools you want the menu to report. The app's OWN version + build is always shown from its bundle and needs no entry here. Each component argv executes directly with a deadline (NO shell interpolation) and the FIRST non-empty stdout line is shown as its version; a nonzero exit, timeout, or empty output shows as 'unavailable' in red. Commands run LAZILY (first expand and Refresh), never on a status poll. 'enabled': false skips a component. Keep real tool names and host paths in the untracked copy.",
+  "components": [
+    {
+      "label": "my-cli",
+      "command": ["brew", "list", "--versions", "my-cli"]
+    },
+    {
+      "label": "my-guard",
+      "command": ["git", "-C", "/Users/you/src/my-guard", "describe", "--tags", "--always", "--dirty"]
+    },
+    {
+      "label": "remote-agent",
+      "enabled": false,
+      "command": ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", "user@host", "my-agent --version"]
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+import SwiftUI
+
+@main
+struct ServerMonitorApp: App {
+    @StateObject private var monitor = ServiceMonitor()
+    @StateObject private var darkmesh = DarkmeshStatusMonitor()
+    @StateObject private var worker = WorkerStatusMonitor()
+    @StateObject private var lidSleep = LidSleepMonitor()
+    @StateObject private var transfers = TransfersMonitor()
+    @StateObject private var protection = ProtectionMonitor()
+    @StateObject private var versions = VersionMonitor()
+    @StateObject private var backgroundService = BackgroundServiceManager()
+    @Environment(\.openWindow) var openWindow
+
+    /// Combined menu-bar tint. Green ONLY when darkmesh verdict is GO (VPN
+    /// Connected + internet + DNS + Tailscale healthy) AND services are ok AND
+    /// nothing needs attention; red if services or darkmesh are bad, yellow if
+    /// degraded, the VPN is off, the transfer gate is active, a guard is down,
+    /// or a transfer has failed.
+    private var combinedTint: Color {
+        if let v = darkmesh.status?.verdict, v == "NO-GO" { return .red }
+        if darkmesh.status?.servicesHealthy == false          { return .red }
+        if monitor.overallStatus == .stopped                { return .red }
+        if let v = darkmesh.status?.verdict, v == "DEGRADED" { return .yellow }
+        if darkmesh.status?.transferGateBlocked == true { return .yellow }
+        if protection.atRisk { return .yellow }   // a fail-closed guard is down — never show "all good"
+        if transfers.needsAttention { return .yellow } // failed work or stale monitoring needs attention
+        if darkmesh.status?.verdict == "GO" { return monitor.overallStatus.color }
+        return .yellow   // no GO verdict (VPN off / IDLE / status missing): not protected
+    }
+
+    var body: some Scene {
+        MenuBarExtra {
+            VStack(spacing: 0) {
+                DarkmeshStatusView(monitor: darkmesh, protection: protection)
+                Divider()
+                WorkerStatusView(monitor: worker)
+                if lidSleep.isLaptop {
+                    Divider()
+                    LidSleepView(monitor: lidSleep)
+                }
+                Divider()
+                TransfersView(monitor: transfers)
+                HStack {
+                    Spacer()
+                    Button {
+                        openWindow(id: "transfer-history")
+                    } label: {
+                        Label("Manager…", systemImage: "rectangle.split.2x1")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+                Divider()
+                MenuBarView(monitor: monitor)
+
+                Divider()
+                VersionsView(monitor: versions)
+
+                Divider()
+
+                HStack {
+                    Button(action: {
+                        openWindow(id: "settings")
+                    }) {
+                        Label("Manage Services", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
+
+                    Spacer()
+
+                    Button("Quit") {
+                        NSApplication.shared.terminate(nil)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
+                }
+                .padding(.vertical, 8)
+            }
+        } label: {
+            Image(systemName: monitor.overallStatus.icon)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(combinedTint)
+        }
+        .menuBarExtraStyle(.window)
+
+        WindowGroup("Settings", id: "settings") {
+            SettingsView(monitor: monitor, backgroundService: backgroundService)
+        }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 500, height: 400)
+
+        WindowGroup("Manager", id: "transfer-history") {
+            TransferHistoryWindow()
+        }
+        .defaultSize(width: 920, height: 600)
+    }
+}

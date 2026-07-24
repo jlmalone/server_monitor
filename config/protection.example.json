@@ -1,0 +1,19 @@
+{
+  "_comment": "Optional read-only Protection panel. Commands execute directly with a deadline; exit 0 = OK and any other outcome = AT RISK. Actuation and scheduling belong to the signed infrastructure agent, never to this polling panel.",
+  "pollSeconds": 300,
+  "timeoutSeconds": 30,
+  "checks": [
+    {
+      "id": "stack-audit",
+      "label": "Background stack healthy",
+      "check": ["/absolute/path/to/your-stack-audit"],
+      "note": "one deep check: signed supervisor, children, scheduled jobs, and fresh status"
+    },
+    {
+      "id": "binding-current",
+      "label": "Client binding is current",
+      "check": ["/absolute/path/to/your-binding-doctor", "--check"],
+      "note": "read-only verification only"
+    }
+  ]
+}

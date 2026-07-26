@@ -61,7 +61,7 @@ Schema (`config/transfers.example.json`):
 | `sources[].maxActiveSnapshotAgeSeconds` | maximum age of `generatedAt` while queue work is running or pending (default 30 seconds, minimum 10) |
 | `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **History** tab in the **Manager** window (opened from the dropdown). Omit to leave it unconfigured. |
 | `history.clearCommand` | optional argv that prunes the history log (e.g. drop FAILED entries); enables a **Clean** button in the History tab. Omit to leave history read-only |
-| `manager.machines` | machines shown in each pane's switcher. Each entry: `label`, optional `local: true` (browse via the local filesystem), `ssh: "user@host"` (browse a remote machine via `ssh ls`), and `start` (initial directory) |
+| `manager.machines` | machines shown in each pane's switcher. Each entry: `label`, optional `local: true` (browse via the local filesystem), `ssh: "user@host"` (preferred remote target), optional ordered `sshFallbacks: ["user@alternate-host"]`, and `start` (initial directory) |
 | `manager.transferCommand` | argv that performs a transfer, with `{mode}`/`{srcMachine}`/`{srcPath}`/`{dstMachine}`/`{dstPath}` placeholders the app fills in (substituted per-element, never into a shell string). Enables the **Files** tab's drag-to-transfer |
 | `manager.moveEnabled` | when `true`, the drop dialog offers **Move** (copy then delete the source) next to **Copy**. Defaults to Copy-only |
 | `manager.chickletsPath` | optional JSON file persisting the pinned **chicklet** shortcuts (machine + path) shown above both panes |
@@ -89,8 +89,9 @@ newest-first, with click-to-drill detail. It also carries **Inventory** and
 read-only / dry-run only — the app never deletes).
 
 With a `manager` block configured, the window's **Files** tab is a dual-pane browser.
-Each pane lists a chosen machine's directory (locally, or via `ssh ls` for a remote)
-and you navigate by double-clicking folders or the up button. **Drag a row from one
+Each pane lists a chosen machine's directory (locally, or via `ssh ls` for a remote).
+When `sshFallbacks` are configured, unreachable SSH targets are tried in order.
+Navigate by double-clicking folders or the up button. **Drag a row from one
 pane onto a folder (or the path bar) of the other** to transfer it *into that exact
 directory*; a dialog shows the source, the `from → into` route, and **Copy**, **Move**
 (only when `moveEnabled`), and **Cancel**. **Chicklets** are pinned root shortcuts

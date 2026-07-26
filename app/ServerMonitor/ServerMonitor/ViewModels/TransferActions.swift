@@ -23,10 +23,18 @@ struct ManagerMachine: Codable, Identifiable, Hashable {
     var label: String
     var local: Bool?
     var ssh: String?            // user@host for remote machines; nil when local
+    var sshFallbacks: [String]? // ordered alternatives tried after ssh
     var start: String?          // initial directory
     var id: String { label }
     var isLocal: Bool { local == true }
     var startPath: String { start ?? (isLocal ? NSHomeDirectory() : "/") }
+    var sshTargets: [String] {
+        var targets: [String] = []
+        for target in [ssh].compactMap({ $0 }) + (sshFallbacks ?? []) {
+            if !target.isEmpty && !targets.contains(target) { targets.append(target) }
+        }
+        return targets
+    }
 }
 
 struct ManagerConfig: Codable {
@@ -74,10 +82,11 @@ enum ListError: Error, LocalizedError {
 enum DirectoryLister {
     static func list(machine: ManagerMachine, path: String) async throws -> [DirEntry] {
         if machine.isLocal { return try listLocal(path: path) }
-        guard let target = machine.ssh, !target.isEmpty else {
+        let targets = machine.sshTargets
+        guard !targets.isEmpty else {
             throw ListError.failed("no ssh target configured for \(machine.label)")
         }
-        return try await listRemote(target: target, machineLabel: machine.label, path: path)
+        return try await listRemote(targets: targets, machineLabel: machine.label, path: path)
     }
 
     private static func listLocal(path: String) throws -> [DirEntry] {
@@ -95,15 +104,18 @@ enum DirectoryLister {
         return sortEntries(out)
     }
 
-    private static func listRemote(target: String, machineLabel: String, path: String) async throws -> [DirEntry] {
+    private static func listRemote(targets: [String], machineLabel: String, path: String) async throws -> [DirEntry] {
         let remote = "cd -- \(shQuote(path)) && /bin/ls -lAp"
-        let r = await run(["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target, remote])
-        if r.status == 255 { throw ListError.unreachable(machineLabel) }
-        if r.status != 0 {
-            let msg = r.err.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ListError.failed(msg.isEmpty ? "ls exited \(r.status)" : msg)
+        for target in targets {
+            let r = await run(["/usr/bin/ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target, remote])
+            if r.status == 255 { continue }
+            if r.status != 0 {
+                let msg = r.err.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw ListError.failed(msg.isEmpty ? "ls exited \(r.status)" : msg)
+            }
+            return sortEntries(parseLS(r.out, parent: path))
         }
-        return sortEntries(parseLS(r.out, parent: path))
+        throw ListError.unreachable(machineLabel)
     }
 
     // MARK: helpers

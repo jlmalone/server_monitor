@@ -20,7 +20,12 @@
   "manager": {
     "machines": [
       {"label": "this-mac", "local": true, "start": "/Users/you"},
-      {"label": "server", "ssh": "you@server.example", "start": "/srv/media"},
+      {
+        "label": "server",
+        "ssh": "you@server.lan",
+        "sshFallbacks": ["you@server.example"],
+        "start": "/srv/media"
+      },
       {"label": "nas", "ssh": "you@nas.example", "start": "/volume1"}
     ],
     "transferCommand": ["your-transfer-helper", "{mode}", "{srcMachine}", "{srcPath}", "{dstMachine}", "{dstPath}"],

@@ -541,6 +541,11 @@ private final class InfrastructureSupervisor {
     }
 }
 
+// Infrastructure work must remain subordinate to interactive use. Descendant
+// processes inherit this priority, so every supervised child and scheduled job
+// starts at the same low CPU priority without wrapper commands in private config.
+_ = setpriority(PRIO_PROCESS, 0, 19)
+
 private let supervisor = InfrastructureSupervisor()
 supervisor.start()
 

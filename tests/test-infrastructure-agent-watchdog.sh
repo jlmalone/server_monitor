@@ -42,6 +42,17 @@ CFFIXED_USER_HOME="$HOME_DIR" HOME="$HOME_DIR" WATCHDOG_STARTS="$TMP/starts" \
   "$TMP/InfrastructureAgent" &
 AGENT_PID=$!
 
+agent_nice=""
+for _ in {1..20}; do
+  agent_nice="$(ps -o ni= -p "$AGENT_PID" | tr -d ' ')"
+  [[ "$agent_nice" == "19" ]] && break
+  sleep 0.1
+done
+[[ "$agent_nice" == "19" ]] || {
+  echo "FAIL: infrastructure agent priority is $agent_nice, expected 19" >&2
+  exit 1
+}
+
 for _ in {1..350}; do
   [[ -f "$TMP/starts" ]] && [[ "$(wc -l < "$TMP/starts" | tr -d ' ')" -ge 2 ]] && break
   sleep 0.1
@@ -64,4 +75,4 @@ PY
 kill -TERM "$AGENT_PID"
 wait "$AGENT_PID"
 AGENT_PID=""
-echo "PASS: unresponsive child is force-killed and restarted"
+echo "PASS: low-priority agent force-kills and restarts an unresponsive child"

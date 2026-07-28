@@ -175,7 +175,9 @@ server_monitor/
 Infrastructure automation follows a separate path: the app registers one signed
 LaunchAgent through `SMAppService`; that agent supervises configured foreground
 helpers and scheduled one-shot jobs. macOS therefore shows one attributable
-background activity instead of one unidentified row per script.
+background activity instead of one unidentified row per script. The agent lowers
+itself to nice 19 before starting work, and its child processes inherit that
+low CPU priority.
 
 ## 🔧 Manual launchd Commands
 

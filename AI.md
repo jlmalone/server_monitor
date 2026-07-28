@@ -40,7 +40,8 @@ Server Monitor manages development servers as persistent background services usi
 Infrastructure automation is separate from those user-defined development
 services. One Developer ID-signed `SMAppService` LaunchAgent, bundled in the app,
 supervises configured foreground helpers and non-overlapping scheduled one-shot
-jobs. Do not add new per-script LaunchAgents for that stack; merge a uniquely
+jobs. It sets itself to nice 19 before launching work, which its descendants
+inherit. Do not add new per-script LaunchAgents for that stack; merge a uniquely
 named entry into `~/.config/server-monitor/infrastructure-agent.json` instead.
 
 ### Core Principle: JSON-First Architecture

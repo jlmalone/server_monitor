@@ -75,9 +75,11 @@ The command must print JSON shaped like
 `transfers.json`, the Transfers panel is inert.
 
 A missing or stale heartbeat, unreadable queue source, or stale active snapshot is
-shown inline and pulls the menu-bar tint off green. An idle queue snapshot may be
-old without being wrong; configure `healthFile` to distinguish that normal case
-from a dead queue producer.
+shown inline and pulls the menu-bar tint off green. A fresh active snapshot is
+itself the authoritative liveness signal because a scheduler heartbeat may remain
+unchanged throughout one long transfer. An idle queue snapshot may be old without
+being wrong; configure `healthFile` to distinguish that normal case from a dead
+queue producer.
 
 The Manager window's **History** tab reads `history.command`, which must print **one
 JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",

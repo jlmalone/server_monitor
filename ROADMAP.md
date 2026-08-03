@@ -16,6 +16,11 @@ breakers, and a last-auto-disconnect footnote. An active VPN-client gate pulls t
 combined tint off green even when broader network health is good. It does not mean
 private LAN or Tailscale transfers are blocked. The app only *reads* the file.
 
+The menu extra is owned by an AppKit `NSStatusItem` and `NSPopover`, with the
+panel content still rendered in SwiftUI. This avoids the system
+`MenuBarExtra(.window)` failure mode where the icon remains visible and accepts
+clicks but no window is presented.
+
 Follow-ups (kept generic):
 - Decode hardening is shipped: schema mismatch, parse failure, missing file, or a
   snapshot older than 60 seconds clears the prior value and fails closed.
@@ -57,10 +62,11 @@ every poll; bounded direct-command fallback remains for remote sources. This
 compact panel is deliberately read-only. Raw byte counters in; the panel derives
 %/ETA.
 
-Optional per-source heartbeat files detect a dead queue producer without
-misclassifying an old-but-valid idle snapshot. Running or pending queues also
-enforce a bounded `generatedAt` age. Either failure is rendered inline and pulls
-the combined tint off green.
+Optional per-source heartbeat files detect a dead idle queue producer without
+misclassifying an old-but-valid idle snapshot. A running or pending queue instead
+uses its bounded `generatedAt` age as direct liveness proof, so a long supervised
+transfer is not marked stale merely because its scheduler invocation is still in
+progress. Either failure is rendered inline and pulls the combined tint off green.
 
 ## Signed infrastructure agent — shipped
 

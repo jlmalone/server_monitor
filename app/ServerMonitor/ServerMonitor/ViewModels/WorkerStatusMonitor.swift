@@ -264,24 +264,27 @@ final class TransfersMonitor: ObservableObject {
                     warnings.append("\u{2018}\(src.label)\u{2019} queue unavailable")
                     continue
                 }
-                if let healthFile = src.healthFile {
-                    let maxAge = max(10, src.maxHealthAgeSeconds ?? 240)
-                    if let reason = SnapshotFreshness.staleReason(
-                        timestamp: nil,
-                        filePath: healthFile,
-                        maxAge: maxAge,
-                        label: "\u{2018}\(src.label)\u{2019} monitor"
-                    ) {
-                        warnings.append(reason)
-                    }
-                }
-                if report.summary.running > 0 || report.summary.pending > 0 {
+                let hasActiveQueue = report.summary.running > 0 || report.summary.pending > 0
+                if hasActiveQueue {
+                    // A fresh active queue snapshot is direct proof that the producer is
+                    // alive. A separate scheduler heartbeat may intentionally remain
+                    // unchanged for the full duration of one long supervised transfer.
                     let maxAge = max(10, src.maxActiveSnapshotAgeSeconds ?? 30)
                     if let reason = SnapshotFreshness.staleReason(
                         timestamp: report.generatedAt,
                         filePath: src.statusFile,
                         maxAge: maxAge,
                         label: "\u{2018}\(src.label)\u{2019} active queue"
+                    ) {
+                        warnings.append(reason)
+                    }
+                } else if let healthFile = src.healthFile {
+                    let maxAge = max(10, src.maxHealthAgeSeconds ?? 240)
+                    if let reason = SnapshotFreshness.staleReason(
+                        timestamp: nil,
+                        filePath: healthFile,
+                        maxAge: maxAge,
+                        label: "\u{2018}\(src.label)\u{2019} monitor"
                     ) {
                         warnings.append(reason)
                     }

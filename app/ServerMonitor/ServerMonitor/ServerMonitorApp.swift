@@ -131,9 +131,12 @@ private struct StatusPopoverContent: View {
 private final class StatusBarController: NSObject, NSPopoverDelegate {
     private let monitor: ServiceMonitor
     private let darkmesh: DarkmeshStatusMonitor
+    private let worker: WorkerStatusMonitor
+    private let lidSleep: LidSleepMonitor
     private let transfers: TransfersMonitor
     private let transferActions: TransferActionsModel
     private let protection: ProtectionMonitor
+    private let versions: VersionMonitor
     private let backgroundService: BackgroundServiceManager
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -155,26 +158,15 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
     ) {
         self.monitor = monitor
         self.darkmesh = darkmesh
+        self.worker = worker
+        self.lidSleep = lidSleep
         self.transfers = transfers
         self.transferActions = transferActions
         self.protection = protection
+        self.versions = versions
         self.backgroundService = backgroundService
         super.init()
 
-        let content = StatusPopoverContent(
-            monitor: monitor,
-            darkmesh: darkmesh,
-            worker: worker,
-            lidSleep: lidSleep,
-            transfers: transfers,
-            transferActions: transferActions,
-            protection: protection,
-            versions: versions,
-            openManager: { [weak self] in self?.showManager() },
-            openSettings: { [weak self] in self?.showSettings() }
-        )
-        let hostingController = NSHostingController(rootView: content)
-        popover.contentViewController = hostingController
         popover.behavior = .transient
         popover.animates = false
         popover.delegate = self
@@ -201,10 +193,34 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            loadPopoverContent()
             let fitting = popover.contentViewController?.view.fittingSize ?? NSSize(width: 320, height: 640)
             popover.contentSize = NSSize(width: 320, height: min(max(fitting.height, 420), 760))
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        // Keep the always-on status item cheap. Releasing the off-screen SwiftUI
+        // tree prevents every monitor tick from laying out a hidden full panel.
+        popover.contentViewController = nil
+    }
+
+    private func loadPopoverContent() {
+        guard popover.contentViewController == nil else { return }
+        let content = StatusPopoverContent(
+            monitor: monitor,
+            darkmesh: darkmesh,
+            worker: worker,
+            lidSleep: lidSleep,
+            transfers: transfers,
+            transferActions: transferActions,
+            protection: protection,
+            versions: versions,
+            openManager: { [weak self] in self?.showManager() },
+            openSettings: { [weak self] in self?.showSettings() }
+        )
+        popover.contentViewController = NSHostingController(rootView: content)
     }
 
     private func observeStatusChanges() {

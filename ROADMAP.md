@@ -19,7 +19,9 @@ private LAN or Tailscale transfers are blocked. The app only *reads* the file.
 The menu extra is owned by an AppKit `NSStatusItem` and `NSPopover`, with the
 panel content still rendered in SwiftUI. This avoids the system
 `MenuBarExtra(.window)` failure mode where the icon remains visible and accepts
-clicks but no window is presented.
+clicks but no window is presented. The SwiftUI panel tree is created on click
+and released when the popover closes, keeping off-screen monitor updates from
+performing needless layout work.
 
 Follow-ups (kept generic):
 - Decode hardening is shipped: schema mismatch, parse failure, missing file, or a

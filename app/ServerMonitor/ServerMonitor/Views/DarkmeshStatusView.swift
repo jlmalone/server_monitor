@@ -47,10 +47,10 @@ struct DarkmeshStatusView: View {
                 .font(.headline)
             Spacer()
             if let s = monitor.status {
-                let transferBlocked = s.transferGateBlocked == true
+                let transferBlocked = s.vpnTransferClientBlocked == true
                 let protected = s.verdict == "GO" && s.servicesHealthy && !transferBlocked
                 let label = transferBlocked
-                    ? "Transfers blocked"
+                    ? "VPN client paused"
                     : (protected
                         ? "Protected"
                         : (s.verdict == "GO" ? "Supervisor degraded" : "\(s.verdictEmoji) \(s.verdict)"))
@@ -84,8 +84,8 @@ struct DarkmeshStatusView: View {
             if let servicesOK = s.servicesOk {
                 probeRow("Supervisor", value: servicesOK ? "healthy" : "degraded", ok: servicesOK)
             }
-            if let transferBlocked = s.transferGateBlocked {
-                probeRow("Transfer gate", value: transferBlocked ? "blocked" : "allowed", ok: !transferBlocked)
+            if let transferBlocked = s.vpnTransferClientBlocked {
+                probeRow("VPN client", value: transferBlocked ? "paused" : "allowed", ok: !transferBlocked)
             }
             if s.crdRequired == true {
                 probeRow("Remote access", value: s.crdOk == true ? "reachable" : (s.crdReason ?? "unreachable"),

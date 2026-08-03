@@ -11,9 +11,10 @@ reads their output/exit codes; it owns no policy and stores no host or tool name
 A compact status row that mirrors a local network-protection status file
 (`/tmp/darkmesh-status.json`) written by a separate per-machine helper: a verdict
 plus VPN / raw-IP / open-internet / DNS / Tailscale / optional remote-access probes,
-transfer-gate state, temporary DNS recovery state, per-fault circuit breakers, and a
-last-auto-disconnect footnote. An active transfer gate pulls the combined tint off
-green even when broader network health is good. The app only *reads* the file.
+VPN-bound public-client gate state, temporary DNS recovery state, per-fault circuit
+breakers, and a last-auto-disconnect footnote. An active VPN-client gate pulls the
+combined tint off green even when broader network health is good. It does not mean
+private LAN or Tailscale transfers are blocked. The app only *reads* the file.
 
 Follow-ups (kept generic):
 - Decode hardening is shipped: schema mismatch, parse failure, missing file, or a

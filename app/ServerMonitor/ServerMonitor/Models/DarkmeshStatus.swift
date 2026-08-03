@@ -124,9 +124,9 @@ struct DarkmeshStatus: Codable, Equatable {
     /// nil when the status file predates the PF field (tolerate-or-warn).
     var pfKillSwitchWired: Bool? { pf?.pfAnchorEvaluated }
 
-    /// True while the transfer-specific PF gate is intentionally blocking.
-    /// This is operationally distinct from the broader network verdict.
-    var transferGateBlocked: Bool? { pf?.pfKillActive }
+    /// True while the PF gate for the VPN-bound public-network transfer client
+    /// is intentionally blocking. Private LAN/Tailscale transfers are separate.
+    var vpnTransferClientBlocked: Bool? { pf?.pfKillActive }
 
     var gaveUpFaults: [String] {
         breakers?.compactMap { key, value in value.gaveUp == true ? key : nil }.sorted() ?? []

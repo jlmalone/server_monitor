@@ -20,14 +20,14 @@ struct ServerMonitorApp: App {
     /// Combined menu-bar tint. Green ONLY when darkmesh verdict is GO (VPN
     /// Connected + internet + DNS + Tailscale healthy) AND services are ok AND
     /// nothing needs attention; red if services or darkmesh are bad, yellow if
-    /// degraded, the VPN is off, the transfer gate is active, a guard is down,
+    /// degraded, the VPN is off, the VPN-client gate is active, a guard is down,
     /// or a transfer has failed.
     private var combinedTint: Color {
         if let v = darkmesh.status?.verdict, v == "NO-GO" { return .red }
         if darkmesh.status?.servicesHealthy == false          { return .red }
         if monitor.overallStatus == .stopped                { return .red }
         if let v = darkmesh.status?.verdict, v == "DEGRADED" { return .yellow }
-        if darkmesh.status?.transferGateBlocked == true { return .yellow }
+        if darkmesh.status?.vpnTransferClientBlocked == true { return .yellow }
         if protection.atRisk { return .yellow }   // a fail-closed guard is down — never show "all good"
         if transfers.needsAttention { return .yellow } // failed work or stale monitoring needs attention
         if transferActions.needsAttention { return .yellow }

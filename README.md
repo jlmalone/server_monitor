@@ -187,7 +187,8 @@ or 192 MiB resident memory. A second breach within 30 minutes exits instead of
 creating a restart loop. Managed services and the signed InfrastructureAgent are
 separate processes and continue under launchd if the UI recovers or exits. The
 native status item creates its SwiftUI panel only when opened and releases that
-off-screen view tree when closed.
+off-screen view tree when closed. Closed Manager and Settings windows likewise
+release their hosted views instead of retaining hidden UI for the app lifetime.
 
 ## 🔧 Manual launchd Commands
 

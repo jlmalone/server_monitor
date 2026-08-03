@@ -128,7 +128,7 @@ private struct StatusPopoverContent: View {
 }
 
 @MainActor
-private final class StatusBarController: NSObject, NSPopoverDelegate {
+private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDelegate {
     private let monitor: ServiceMonitor
     private let darkmesh: DarkmeshStatusMonitor
     private let worker: WorkerStatusMonitor
@@ -283,6 +283,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
             window.setContentSize(NSSize(width: 500, height: 400))
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.isReleasedWhenClosed = false
+            window.delegate = self
             window.center()
             settingsWindow = window
         }
@@ -298,6 +299,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
             window.setContentSize(NSSize(width: 920, height: 600))
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.isReleasedWhenClosed = false
+            window.delegate = self
             window.center()
             managerWindow = window
         }
@@ -308,5 +310,14 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
         guard let window else { return }
         NSApplication.shared.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        if window === settingsWindow {
+            settingsWindow = nil
+        } else if window === managerWindow {
+            managerWindow = nil
+        }
     }
 }

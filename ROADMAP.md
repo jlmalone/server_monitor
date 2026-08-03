@@ -21,7 +21,8 @@ panel content still rendered in SwiftUI. This avoids the system
 `MenuBarExtra(.window)` failure mode where the icon remains visible and accepts
 clicks but no window is presented. The SwiftUI panel tree is created on click
 and released when the popover closes, keeping off-screen monitor updates from
-performing needless layout work.
+performing needless layout work. Manager and Settings release their hosted views
+when their windows close for the same reason.
 
 Follow-ups (kept generic):
 - Decode hardening is shipped: schema mismatch, parse failure, missing file, or a

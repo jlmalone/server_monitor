@@ -225,47 +225,99 @@ struct TransfersView: View {
 
 // MARK: - Transfer History window
 
+private enum TransferWorkspaceTab: Int, CaseIterable, Identifiable {
+    case files
+    case history
+    case logs
+    case inventory
+    case reclaim
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .files: return "Files"
+        case .history: return "History"
+        case .logs: return "Logs"
+        case .inventory: return "Inventory"
+        case .reclaim: return "Reclaim"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .files: return "rectangle.split.2x1"
+        case .history: return "clock.arrow.circlepath"
+        case .logs: return "doc.text.magnifyingglass"
+        case .inventory: return "shippingbox"
+        case .reclaim: return "trash.slash"
+        }
+    }
+}
+
 /// Secondary window opened from the dropdown: browse/inspect the transfer tool's
 /// past operations, with stub tabs for Inventory and Reclaim that activate once
 /// the tool exposes them as JSON (roadmap "Transfer History + Inventory + Reclaim
 /// window"). Reclaim is read-only/dry-run only by design — this window never deletes.
 struct TransferHistoryWindow: View {
     @ObservedObject var actions: TransferActionsModel
-    @State private var selectedTab = 0
+    @State private var selectedTab = TransferWorkspaceTab.files
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ManagerView(actions: actions, showLogs: { selectedTab = 2 })
-                .tabItem { Label("Files", systemImage: "rectangle.split.2x1") }
-                .tag(0)
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                ForEach(TransferWorkspaceTab.allCases) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        Label(tab.title, systemImage: tab.systemImage)
+                            .font(.callout)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.primary)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(selectedTab == tab ? Color.accentColor.opacity(0.14) : Color.clear)
+                    )
+                    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+                }
+            }
+            .padding(8)
 
+            Divider()
+            selectedContent
+        }
+        .frame(minWidth: 860, minHeight: 520)
+    }
+
+    @ViewBuilder
+    private var selectedContent: some View {
+        switch selectedTab {
+        case .files:
+            ManagerView(actions: actions, showLogs: { selectedTab = .logs })
+        case .history:
             TransferHistoryTab()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-                .tag(1)
-
+        case .logs:
             TransferLogsView(actions: actions)
-                .tabItem { Label("Logs", systemImage: "doc.text.magnifyingglass") }
-                .tag(2)
-
+        case .inventory:
             TransferToolStubTab(
                 title: "Inventory",
                 systemImage: "shippingbox",
                 message: "For each title: which machines hold it and whether a verified copy exists elsewhere.",
                 detail: "Activates once the transfer tool exposes inventory as JSON (roadmap Phase 16)."
             )
-            .tabItem { Label("Inventory", systemImage: "shippingbox") }
-            .tag(3)
-
+        case .reclaim:
             TransferToolStubTab(
                 title: "Reclaim",
                 systemImage: "trash.slash",
-                message: "What is safely reclaimable locally and how much space — read-only / dry-run only.",
+                message: "What is safely reclaimable locally and how much space, with read-only and dry-run behavior.",
                 detail: "Destructive reclaim stays a deliberate CLI action with live re-verification; this window never deletes. Activates once the tool exposes reclaim as JSON (roadmap Phase 16)."
             )
-            .tabItem { Label("Reclaim", systemImage: "trash.slash") }
-            .tag(4)
         }
-        .frame(minWidth: 860, minHeight: 520)
     }
 }
 

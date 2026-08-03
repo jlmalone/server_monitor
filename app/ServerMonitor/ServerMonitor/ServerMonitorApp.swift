@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ServerMonitorApp: App {
+    @NSApplicationDelegateAdaptor(ServerMonitorApplicationDelegate.self) private var appDelegate
     @StateObject private var monitor = ServiceMonitor()
     @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @StateObject private var worker = WorkerStatusMonitor()

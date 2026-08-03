@@ -24,6 +24,14 @@ Transfers panel. Running, retrying, and failed Manager work therefore remains
 visible after the Manager window closes; failures also downgrade the menu-bar
 tint until the finished operation is cleared.
 
+The Manager window uses an in-content button strip for section navigation. Do
+not replace it with a toolbar-backed `TabView`: a long-running AppKit toolbar
+layout cycle previously drove the otherwise idle UI to sustained high CPU and
+excessive memory growth. `AppResourceGuard` is the independent backstop: three
+30-second samples at 25% of one core or 192 MiB resident memory trigger one
+relaunch, with a 30-minute cooldown that exits on a second breach instead of
+looping.
+
 The **Lid Close** panel is fully generic and needs no config: on laptops it
 toggles `pmset disablesleep` so the Mac keeps running with the lid shut (read is
 unprivileged; the change goes through the native admin prompt — no helper daemon or

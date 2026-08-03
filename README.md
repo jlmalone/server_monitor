@@ -15,6 +15,7 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 - **📊 Health Checks** - HTTP health monitoring for each service
 - **🧩 One Signed Supervisor** - Infrastructure helpers and scheduled jobs share one Developer ID-signed background registration
 - **⏱️ Bounded Polling** - Read-only checks execute directly with deadlines; local transfer status uses an atomic file
+- **🔋 Resource Guard** - Sustained UI CPU or memory runaway triggers bounded app recovery instead of draining battery indefinitely
 - **📝 Centralized Logs** - All service logs in one configurable location
 - **🚀 JSON-first Config** - Single source of truth in `services.json`
 - **🔒 Boot Persistence** - Services start automatically at login
@@ -178,6 +179,13 @@ helpers and scheduled one-shot jobs. macOS therefore shows one attributable
 background activity instead of one unidentified row per script. The agent lowers
 itself to nice 19 before starting work, and its child processes inherit that
 low CPU priority.
+
+The menu-bar UI is expected to remain nearly idle between bounded polls. A
+low-frequency in-process guard samples its own resource use every 30 seconds. It
+relaunches the UI after three consecutive samples at or above 25% of one CPU core
+or 192 MiB resident memory. A second breach within 30 minutes exits instead of
+creating a restart loop. Managed services and the signed InfrastructureAgent are
+separate processes and continue under launchd if the UI recovers or exits.
 
 ## 🔧 Manual launchd Commands
 

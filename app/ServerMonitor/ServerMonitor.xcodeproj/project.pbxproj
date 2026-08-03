@@ -29,6 +29,8 @@
 		020 /* InfrastructureAgent in Embed Infrastructure Agent */ = {isa = PBXBuildFile; fileRef = 120 /* InfrastructureAgent */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		021 /* vision.salient.InfrastructureAgent.plist in Embed LaunchAgent */ = {isa = PBXBuildFile; fileRef = 119 /* vision.salient.InfrastructureAgent.plist */; };
 		022 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 121 /* AppIcon.icns */; };
+		023 /* ResourceGuardPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122 /* ResourceGuardPolicy.swift */; };
+		024 /* AppResourceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123 /* AppResourceGuard.swift */; };
 		0EDFDA6B94849FE8E8D3C91C /* VersionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D921527967B8815AB855C1A7 /* VersionsView.swift */; };
 		C40171492CB7DC60BB142D85 /* VersionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7DCC649615B7F19B76B2F2 /* VersionMonitor.swift */; };
 /* End PBXBuildFile section */
@@ -91,6 +93,8 @@
 		119 /* vision.salient.InfrastructureAgent.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = vision.salient.InfrastructureAgent.plist; sourceTree = "<group>"; };
 		120 /* InfrastructureAgent */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = InfrastructureAgent; sourceTree = BUILT_PRODUCTS_DIR; };
 		121 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = ../../AppIcon.icns; sourceTree = "<group>"; };
+		122 /* ResourceGuardPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceGuardPolicy.swift; sourceTree = "<group>"; };
+		123 /* AppResourceGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppResourceGuard.swift; sourceTree = "<group>"; };
 		5D7DCC649615B7F19B76B2F2 /* VersionMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VersionMonitor.swift; sourceTree = "<group>"; };
 		D921527967B8815AB855C1A7 /* VersionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VersionsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -186,6 +190,8 @@
 			isa = PBXGroup;
 			children = (
 				116 /* ProcessRunner.swift */,
+				122 /* ResourceGuardPolicy.swift */,
+				123 /* AppResourceGuard.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -316,6 +322,8 @@
 				015 /* TransferBoardView.swift in Sources */,
 				016 /* ProcessRunner.swift in Sources */,
 				017 /* BackgroundServiceManager.swift in Sources */,
+				023 /* ResourceGuardPolicy.swift in Sources */,
+				024 /* AppResourceGuard.swift in Sources */,
 				C40171492CB7DC60BB142D85 /* VersionMonitor.swift in Sources */,
 				0EDFDA6B94849FE8E8D3C91C /* VersionsView.swift in Sources */,
 			);
@@ -465,7 +473,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -491,7 +499,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -516,7 +524,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -535,7 +543,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;

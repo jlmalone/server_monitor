@@ -2,7 +2,6 @@ import SwiftUI
 
 @main
 struct ServerMonitorApp: App {
-    @NSApplicationDelegateAdaptor(ServerMonitorApplicationDelegate.self) private var appDelegate
     @StateObject private var monitor = ServiceMonitor()
     @StateObject private var darkmesh = DarkmeshStatusMonitor()
     @StateObject private var worker = WorkerStatusMonitor()
@@ -13,6 +12,10 @@ struct ServerMonitorApp: App {
     @StateObject private var versions = VersionMonitor()
     @StateObject private var backgroundService = BackgroundServiceManager()
     @Environment(\.openWindow) var openWindow
+
+    init() {
+        AppResourceGuard.shared.start()
+    }
 
     /// Combined menu-bar tint. Green ONLY when darkmesh verdict is GO (VPN
     /// Connected + internet + DNS + Tailscale healthy) AND services are ok AND

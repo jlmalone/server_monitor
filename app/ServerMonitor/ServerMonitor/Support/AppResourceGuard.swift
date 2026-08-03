@@ -6,6 +6,8 @@ import OSLog
 /// Protects a normally idle menu-bar app from silently consuming a core or
 /// retaining hundreds of megabytes after a framework or UI fault.
 final class AppResourceGuard {
+    static let shared = AppResourceGuard()
+
     private struct Snapshot {
         let uptime: TimeInterval
         let cpuSeconds: TimeInterval
@@ -22,6 +24,8 @@ final class AppResourceGuard {
         residentByteLimit: AppResourceLimits.residentBytes,
         requiredSamples: AppResourceLimits.requiredSamples
     )
+
+    private init() {}
 
     func start() {
         queue.async { [weak self] in
@@ -122,13 +126,5 @@ final class AppResourceGuard {
         }
 
         exit(EXIT_SUCCESS)
-    }
-}
-
-final class ServerMonitorApplicationDelegate: NSObject, NSApplicationDelegate {
-    private let resourceGuard = AppResourceGuard()
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        resourceGuard.start()
     }
 }

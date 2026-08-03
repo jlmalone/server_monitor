@@ -154,7 +154,7 @@ Services are defined in `services.json` (auto-generated on first run):
 
 ```
 server_monitor/
-├── app/                 # SwiftUI Menu Bar App
+├── app/                 # Native status item + SwiftUI panel app
 │   └── ServerMonitor/   # App + embedded InfrastructureAgent
 ├── cli/                 # Node.js CLI tool
 │   ├── src/commands/    # Command implementations
@@ -185,7 +185,9 @@ low-frequency in-process guard samples its own resource use every 30 seconds. It
 relaunches the UI after three consecutive samples at or above 25% of one CPU core
 or 192 MiB resident memory. A second breach within 30 minutes exits instead of
 creating a restart loop. Managed services and the signed InfrastructureAgent are
-separate processes and continue under launchd if the UI recovers or exits.
+separate processes and continue under launchd if the UI recovers or exits. The
+native status item creates its SwiftUI panel only when opened and releases that
+off-screen view tree when closed.
 
 ## 🔧 Manual launchd Commands
 

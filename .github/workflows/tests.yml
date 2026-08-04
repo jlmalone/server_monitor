@@ -14,6 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - run: ./tests/test-background-registration-stamp.sh
+      - run: ./tests/test-resource-guard-policy.sh
+      - run: ./tests/test-infrastructure-agent-watchdog.sh
+      - run: ./tests/test-monitor-health.sh
+
   cli:
     runs-on: macos-14
     timeout-minutes: 15

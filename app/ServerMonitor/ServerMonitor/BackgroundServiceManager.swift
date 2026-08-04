@@ -1,9 +1,22 @@
+import Foundation
 import ServiceManagement
 import SwiftUI
+
+struct BackgroundRegistrationStamp {
+    static func current(bundle: Bundle = .main) -> String {
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        return "\(bundle.bundleURL.standardizedFileURL.path)|\(version)"
+    }
+
+    static func needsRefresh(stored: String?, current: String) -> Bool {
+        stored != current
+    }
+}
 
 @MainActor
 final class BackgroundServiceManager: ObservableObject {
     static let agentPlistName = "vision.salient.InfrastructureAgent.plist"
+    private static let registrationStampKey = "backgroundRegistrationStamp"
 
     @Published private(set) var agentStatus: SMAppService.Status = .notRegistered
     @Published private(set) var loginStatus: SMAppService.Status = .notRegistered
@@ -11,10 +24,18 @@ final class BackgroundServiceManager: ObservableObject {
 
     private let agent = SMAppService.agent(plistName: agentPlistName)
     private let loginItem = SMAppService.mainApp
+    private let defaults: UserDefaults
+    private let registrationStamp: String
 
-    init(autoRegister: Bool = true) {
+    init(
+        autoRegister: Bool = true,
+        defaults: UserDefaults = .standard,
+        registrationStamp: String = BackgroundRegistrationStamp.current()
+    ) {
+        self.defaults = defaults
+        self.registrationStamp = registrationStamp
         refresh()
-        if autoRegister { registerIfNeeded() }
+        if autoRegister { reconcileRegistration() }
     }
 
     var agentStatusText: String { description(agentStatus) }
@@ -23,10 +44,8 @@ final class BackgroundServiceManager: ObservableObject {
 
     func registerIfNeeded() {
         var errors: [String] = []
-        register(loginItem, named: "Login item", errors: &errors)
-        register(agent, named: "Infrastructure agent", errors: &errors)
-        lastError = errors.isEmpty ? nil : errors.joined(separator: " ")
-        refresh()
+        registerServices(errors: &errors)
+        finishRegistration(errors: errors)
     }
 
     func unregisterAgent() {
@@ -60,6 +79,56 @@ final class BackgroundServiceManager: ObservableObject {
             break
         @unknown default:
             errors.append("\(name): unsupported service status")
+        }
+    }
+
+    private func reconcileRegistration() {
+        var errors: [String] = []
+        let storedStamp = defaults.string(forKey: Self.registrationStampKey)
+        if BackgroundRegistrationStamp.needsRefresh(stored: storedStamp, current: registrationStamp) {
+            unregisterIfRegistered(agent, named: "Infrastructure agent", errors: &errors)
+            unregisterIfRegistered(loginItem, named: "Login item", errors: &errors)
+            refresh()
+        }
+        registerServices(errors: &errors)
+        finishRegistration(errors: errors)
+    }
+
+    private func registerServices(errors: inout [String]) {
+        register(loginItem, named: "Login item", errors: &errors)
+        register(agent, named: "Infrastructure agent", errors: &errors)
+    }
+
+    private func unregisterIfRegistered(
+        _ service: SMAppService,
+        named name: String,
+        errors: inout [String]
+    ) {
+        switch service.status {
+        case .enabled, .requiresApproval:
+            do {
+                try service.unregister()
+            } catch {
+                errors.append("\(name) refresh: \(error.localizedDescription)")
+            }
+        case .notRegistered, .notFound:
+            break
+        @unknown default:
+            errors.append("\(name) refresh: unsupported service status")
+        }
+    }
+
+    private func finishRegistration(errors: [String]) {
+        lastError = errors.isEmpty ? nil : errors.joined(separator: " ")
+        refresh()
+        if errors.isEmpty, registrationIsUsable {
+            defaults.set(registrationStamp, forKey: Self.registrationStampKey)
+        }
+    }
+
+    private var registrationIsUsable: Bool {
+        [loginItem.status, agent.status].allSatisfy {
+            $0 == .enabled || $0 == .requiresApproval
         }
     }
 

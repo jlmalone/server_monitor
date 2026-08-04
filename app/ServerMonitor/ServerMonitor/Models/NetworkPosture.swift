@@ -70,7 +70,20 @@ struct NetworkPeer: Decodable, Equatable, Identifiable { let name: String; var o
 struct NetworkCheck: Decodable { var ok: Bool?; var reason: String?; var output: String?; var path: String?; var latencyMs: Double?; var summary: String { if ok == true { return [latencyMs.map { "\(Int($0)) ms" },path].compactMap { $0 }.joined(separator:" via ").nilIfEmpty ?? "ok" }; return reason ?? "unavailable" } }
 struct RemoteCheck: Decodable { var available: Bool?; var reason: String?; var report: RemoteReport? }
 struct RemoteReport: Decodable, Equatable { var desiredProfile: String?; var observed: NetworkObserved?; var assessment: NetworkAssessment?; var tailscale: TailscaleLocal?; var audit: RemoteCommandResult?; var transferReadiness: RemoteCommandResult? }
-struct RemoteCommandResult: Decodable, Equatable { var ok: Bool?; var code: Int?; var stdout: String?; var stderr: String?; var result: RemoteAuditResult? }
+struct RemoteCommandResult: Decodable, Equatable {
+    var ok: Bool?; var code: Int?; var stdout: String?; var stderr: String?; var result: RemoteAuditResult?; var state: String?
+    var transferSummary: String {
+        switch state {
+        case "ready": return "ready"
+        case "unconfigured": return "not configured"
+        case "blocked": return "blocked"
+        default:
+            if ok == true { return "ready" }
+            let detail = "\(stdout ?? "")\n\(stderr ?? "")".lowercased()
+            return detail.contains("missing:") || detail.contains("not configured") ? "not configured" : "blocked"
+        }
+    }
+}
 struct RemoteAuditResult: Decodable, Equatable { var ok: Bool?; var checks: [RemoteAuditCheck]?; var verdict: String? }
 struct RemoteAuditCheck: Decodable, Equatable { var id: String?; var ok: Bool?; var detail: String? }
 struct ProfilesEnvelope: Decodable { let schema: Int; let kind: String; let profiles: [NetworkPostureChoice] }

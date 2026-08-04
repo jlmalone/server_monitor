@@ -13,6 +13,34 @@ from **untracked** local files that are **never committed** to this repo:
 | **Transfers** | Active file transfers (per item: %, rate, ETA), preferably from an atomically written local status file. | `~/.config/server-monitor/transfers.json` |
 | **Protection** | Read-only fail-closed integrity: one **OK / AT RISK** badge from bounded audit commands. | `~/.config/server-monitor/protection.json` |
 | **Infrastructure Agent** | One signed registration that supervises persistent helpers, scheduled one-shot jobs, and network-change wakeups. | `~/.config/server-monitor/infrastructure-agent.json` |
+| **Network Status** | Compact desired/observed network posture, topology, peer state, and bounded health probes. | `~/.config/server-monitor/network.json` |
+
+## Network Status config
+
+Copy `config/network.example.json` to `~/.config/server-monitor/network.json`. It is
+optional: without it, Network Status remains inert. `schema` is currently `1`.
+
+Darkmesh command sources use its schema-2 envelopes: `profiles` returns the profile
+array; `show` returns desired profile, observed status, and producer assessment;
+`topology` returns passive local interfaces, routes, Tailscale health, and cached peer
+state; `probe` is the explicit active peer check. Unknown fields are ignored, but an
+unsupported envelope is unavailable rather than treated as healthy.
+
+`probeCommand`, `probes`, and `diagnostics` are bounded direct argv arrays. Probes must be read-only;
+use them for peer posture, health, VPN, SSH, and transfer-readiness checks. A failed
+required probe is red; failed optional probes and producer degradation are yellow.
+`postures[].set_command` is the only mutating hook and always presents an explicit
+confirmation before execution. No command is shell-interpolated. Set only values
+appropriate for the local trusted machine, and do not commit this file.
+
+Command-driven producers may instead supply `profilesCommand`, `statusCommand`,
+`topologyCommand`, and `probeCommand`, each a bounded direct argv array. The periodic window refresh runs
+only local status/topology sources; SSH, remote health, deep audits, and logs are
+explicit user actions. `applyCommand` is one argv template and must include a whole
+`{profile}` element or substring; replacement is per argv element, never shell text.
+Profiles may carry `id`, `title`, required/preferred/forbidden maps, priority,
+degraded state, capabilities, and a connectivity consequence. `logSources` read a
+capped local-file tail or run a bounded log command only after Refresh.
 
 ## Worker config
 

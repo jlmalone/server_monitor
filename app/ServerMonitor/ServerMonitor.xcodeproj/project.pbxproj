@@ -33,6 +33,9 @@
 		024 /* AppResourceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123 /* AppResourceGuard.swift */; };
 		0EDFDA6B94849FE8E8D3C91C /* VersionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D921527967B8815AB855C1A7 /* VersionsView.swift */; };
 		C40171492CB7DC60BB142D85 /* VersionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7DCC649615B7F19B76B2F2 /* VersionMonitor.swift */; };
+		A101 /* NetworkPosture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201 /* NetworkPosture.swift */; };
+		A102 /* NetworkPostureMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202 /* NetworkPostureMonitor.swift */; };
+		A103 /* NetworkStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203 /* NetworkStatusView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +100,9 @@
 		123 /* AppResourceGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppResourceGuard.swift; sourceTree = "<group>"; };
 		5D7DCC649615B7F19B76B2F2 /* VersionMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VersionMonitor.swift; sourceTree = "<group>"; };
 		D921527967B8815AB855C1A7 /* VersionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VersionsView.swift; sourceTree = "<group>"; };
+		A201 /* NetworkPosture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPosture.swift; sourceTree = "<group>"; };
+		A202 /* NetworkPostureMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPostureMonitor.swift; sourceTree = "<group>"; };
+		A203 /* NetworkStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkStatusView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,6 +160,7 @@
 			children = (
 				102 /* Service.swift */,
 				107 /* DarkmeshStatus.swift */,
+				A201 /* NetworkPosture.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -167,6 +174,7 @@
 				112 /* LidSleepMonitor.swift */,
 				114 /* TransferActions.swift */,
 				5D7DCC649615B7F19B76B2F2 /* VersionMonitor.swift */,
+				A202 /* NetworkPostureMonitor.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -182,6 +190,7 @@
 				113 /* LidSleepView.swift */,
 				115 /* TransferBoardView.swift */,
 				D921527967B8815AB855C1A7 /* VersionsView.swift */,
+				A203 /* NetworkStatusView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -326,6 +335,9 @@
 				024 /* AppResourceGuard.swift in Sources */,
 				C40171492CB7DC60BB142D85 /* VersionMonitor.swift in Sources */,
 				0EDFDA6B94849FE8E8D3C91C /* VersionsView.swift in Sources */,
+				A101 /* NetworkPosture.swift in Sources */,
+				A102 /* NetworkPostureMonitor.swift in Sources */,
+				A103 /* NetworkStatusView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -473,7 +485,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -485,7 +497,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.ServerMonitor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -499,7 +511,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -511,7 +523,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.ServerMonitor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -524,13 +536,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Server Monitor Infrastructure Agent";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.InfrastructureAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -543,13 +555,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Server Monitor Infrastructure Agent";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.InfrastructureAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

@@ -53,6 +53,7 @@ scripts/.env
 *.local.md
 config/worker.json
 config/transfers.json
+config/network.json
 
 # Backup/archive folders
 launchd_bak_todo/

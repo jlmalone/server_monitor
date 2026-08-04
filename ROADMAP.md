@@ -33,6 +33,20 @@ Follow-ups (kept generic):
   decoded and rendered, including signed-supervisor health. Policy actuation stays
   outside the read-only polling UI.
 
+## Network Status window — shipped
+
+A separate lazy, floating window consumes the versioned Darkmesh posture
+contract. It shows desired and observed policy, required failures versus yellow
+nice-to-have degradation, real interfaces and effective routes, Tailscale control
+health and peers, cached manual active probes, bounded diagnostics, and capped log
+tails. Passive local topology polls only while the window is open. Peer ping, TCP,
+SSH, remote audit, transfer-readiness checks, and posture changes remain explicit
+button actions. The strict zero-general-egress-leak profile stays disabled until
+Darkmesh publishes that capability honestly.
+
+The existing Manager window now floats across Spaces as well as raising its
+single existing instance on every invocation.
+
 ## Protection panel (read-only integrity) — shipped
 
 A single **OK / AT RISK** badge (distinct from the VPN verdict) that verifies the

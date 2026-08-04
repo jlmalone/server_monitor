@@ -76,6 +76,7 @@ private struct StatusPopoverContent: View {
 
     let openManager: () -> Void
     let openSettings: () -> Void
+    let openNetwork: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -89,6 +90,8 @@ private struct StatusPopoverContent: View {
             Divider()
             TransfersView(monitor: transfers, actions: transferActions)
             HStack {
+                Button(action: openNetwork) { Label("Network Status…", systemImage: "point.3.connected.trianglepath.dotted").font(.caption) }
+                    .buttonStyle(.borderless)
                 Spacer()
                 Button(action: openManager) {
                     Label("Manager…", systemImage: "rectangle.split.2x1")
@@ -138,12 +141,14 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     private let protection: ProtectionMonitor
     private let versions: VersionMonitor
     private let backgroundService: BackgroundServiceManager
+    private var network: NetworkPostureMonitor?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let popover = NSPopover()
     private var cancellables = Set<AnyCancellable>()
     private var settingsWindow: NSWindow?
     private var managerWindow: NSWindow?
+    private var networkWindow: NSWindow?
 
     init(
         monitor: ServiceMonitor,
@@ -218,7 +223,8 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             protection: protection,
             versions: versions,
             openManager: { [weak self] in self?.showManager() },
-            openSettings: { [weak self] in self?.showSettings() }
+            openSettings: { [weak self] in self?.showSettings() },
+            openNetwork: { [weak self] in self?.showNetworkStatus() }
         )
         popover.contentViewController = NSHostingController(rootView: content)
     }
@@ -298,12 +304,35 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             window.title = "Manager"
             window.setContentSize(NSSize(width: 920, height: 600))
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
             managerWindow = window
         }
         present(managerWindow)
+    }
+
+    private func showNetworkStatus() {
+        popover.performClose(nil)
+        if networkWindow == nil {
+            let monitor = NetworkPostureMonitor()
+            monitor.start()
+            let controller = NSHostingController(rootView: NetworkStatusWindow(monitor: monitor))
+            let window = NSWindow(contentViewController: controller)
+            window.title = "Network Status"
+            window.setContentSize(NSSize(width: 760, height: 600))
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            networkWindow = window
+            network = monitor
+        }
+        present(networkWindow)
     }
 
     private func present(_ window: NSWindow?) {
@@ -318,6 +347,10 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             settingsWindow = nil
         } else if window === managerWindow {
             managerWindow = nil
+        } else if window === networkWindow {
+            network?.stop()
+            network = nil
+            networkWindow = nil
         }
     }
 }

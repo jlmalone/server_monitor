@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "pollSeconds": 30,
+  "profilesCommand": ["/opt/homebrew/bin/darkmesh", "posture", "profiles", "--json"],
+  "statusCommand": ["/opt/homebrew/bin/darkmesh", "posture", "show", "--json"],
+  "topologyCommand": ["/opt/homebrew/bin/darkmesh", "posture", "topology", "--json"],
+  "probeCommand": ["/opt/homebrew/bin/darkmesh", "posture", "probe", "--json"],
+  "activeProbeTimeoutSeconds": 120,
+  "applyCommand": ["/opt/homebrew/bin/darkmesh", "posture", "apply", "{profile}"],
+  "postures": [],
+  "probes": [
+    { "id": "local-health", "label": "Run local health", "command": ["/opt/homebrew/bin/darkmesh", "posture", "health", "--json"], "required": true, "timeoutSeconds": 20 },
+    { "id": "tailscale-netcheck", "label": "Run Tailscale netcheck", "command": ["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "netcheck"], "required": false, "timeoutSeconds": 30 }
+  ],
+  "diagnostics": [
+    { "id": "audit", "label": "Run Darkmesh audit", "command": ["/opt/homebrew/bin/darkmesh", "audit", "--json"], "timeoutSeconds": 30 },
+    { "id": "transfer-check", "label": "Check transfer binding", "command": ["/opt/homebrew/bin/transfer-vpn-doctor", "--check"], "timeoutSeconds": 15 }
+  ],
+  "logSources": [
+    { "id": "actions", "label": "Darkmesh actions", "path": "~/Library/Logs/darkmesh/actions.log" },
+    { "id": "healthcheck", "label": "Darkmesh health", "path": "~/Library/Logs/darkmesh/healthcheck.log" },
+    { "id": "reconnect", "label": "Darkmesh reconnect", "path": "~/Library/Logs/darkmesh/reconnect.log" }
+  ]
+}

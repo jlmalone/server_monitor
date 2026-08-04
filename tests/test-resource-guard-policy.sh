@@ -10,3 +10,10 @@ xcrun swiftc \
   "$ROOT/tests/ResourceGuardPolicyTests.swift" \
   -o "$TMP/test-resource-guard-policy"
 "$TMP/test-resource-guard-policy"
+
+xcrun swiftc \
+  "$ROOT/app/ServerMonitor/ServerMonitor/Support/ResourceGuardPolicy.swift" \
+  "$ROOT/app/ServerMonitor/ServerMonitor/Support/AppResourceGuard.swift" \
+  "$ROOT/tests/AppResourcePriorityTests.swift" \
+  -o "$TMP/test-app-resource-priority"
+"$TMP/test-app-resource-priority"

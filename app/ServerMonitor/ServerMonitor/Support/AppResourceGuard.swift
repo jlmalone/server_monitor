@@ -28,6 +28,9 @@ final class AppResourceGuard {
     private init() {}
 
     func start() {
+        // A menu-bar monitor must yield to transfers, builds, and foreground
+        // work even before the sustained-resource guard has enough samples.
+        _ = setpriority(PRIO_PROCESS, 0, 19)
         queue.async { [weak self] in
             guard let self, self.timer == nil else { return }
             self.previous = self.snapshot()

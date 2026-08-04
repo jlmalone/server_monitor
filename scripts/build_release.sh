@@ -10,16 +10,23 @@ SCHEME="ServerMonitor"
 BUILD_ROOT="$PROJECT_ROOT/build/release"
 DIST_DIR="$PROJECT_ROOT/dist"
 NOTARIZE=0
+UNSIGNED_APP=""
 
 usage() {
-  echo "Usage: ./scripts/build_release.sh [--notarize]" >&2
+  echo "Usage: ./scripts/build_release.sh [--notarize] [--unsigned-app PATH]" >&2
 }
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --notarize) NOTARIZE=1 ;;
+    --unsigned-app)
+      shift
+      [[ $# -gt 0 ]] || { usage; exit 2; }
+      UNSIGNED_APP="$1"
+      ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
+  shift
 done
 
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
@@ -45,19 +52,26 @@ TEAM_ID="${APPLE_TEAM_ID:-$IDENTITY_TEAM}"
   exit 1
 }
 
-rm -rf "$BUILD_ROOT" "$DIST_DIR"
-mkdir -p "$BUILD_ROOT" "$DIST_DIR"
-
-xcodebuild \
-  -project "$XCODE_PROJECT" \
-  -scheme "$SCHEME" \
-  -configuration Release \
-  -destination 'generic/platform=macOS' \
-  -derivedDataPath "$BUILD_ROOT" \
-  CODE_SIGNING_ALLOWED=NO \
-  clean build
-
-BUILT_APP="$BUILD_ROOT/Build/Products/Release/ServerMonitor.app"
+if [[ -n "$UNSIGNED_APP" ]]; then
+  UNSIGNED_APP="$(cd "$(dirname "$UNSIGNED_APP")" && pwd)/$(basename "$UNSIGNED_APP")"
+fi
+rm -rf "$DIST_DIR"
+mkdir -p "$DIST_DIR"
+if [[ -n "$UNSIGNED_APP" ]]; then
+  BUILT_APP="$UNSIGNED_APP"
+else
+  rm -rf "$BUILD_ROOT"
+  mkdir -p "$BUILD_ROOT"
+  xcodebuild \
+    -project "$XCODE_PROJECT" \
+    -scheme "$SCHEME" \
+    -configuration Release \
+    -destination 'generic/platform=macOS' \
+    -derivedDataPath "$BUILD_ROOT" \
+    CODE_SIGNING_ALLOWED=NO \
+    clean build
+  BUILT_APP="$BUILD_ROOT/Build/Products/Release/ServerMonitor.app"
+fi
 [[ -d "$BUILT_APP" ]] || { echo "ERROR: build product missing: $BUILT_APP" >&2; exit 1; }
 cp -R "$BUILT_APP" "$DIST_DIR/ServerMonitor.app"
 APP="$DIST_DIR/ServerMonitor.app"

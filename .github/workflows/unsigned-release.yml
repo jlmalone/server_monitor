@@ -1,0 +1,47 @@
+name: Unsigned macOS release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unsigned-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build universal unsigned app
+        run: |
+          xcodebuild \
+            -project app/ServerMonitor/ServerMonitor.xcodeproj \
+            -scheme ServerMonitor \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/unsigned-release \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+      - name: Verify and archive app
+        run: |
+          app='build/unsigned-release/Build/Products/Release/ServerMonitor.app'
+          test -x "$app/Contents/MacOS/ServerMonitor"
+          test -x "$app/Contents/Resources/InfrastructureAgent"
+          test -f "$app/Contents/Library/LaunchAgents/vision.salient.InfrastructureAgent.plist"
+          lipo "$app/Contents/MacOS/ServerMonitor" -verify_arch arm64 x86_64
+          lipo "$app/Contents/Resources/InfrastructureAgent" -verify_arch arm64 x86_64
+          plutil -lint "$app/Contents/Info.plist"
+          mkdir -p build/artifact
+          ditto -c -k --keepParent --sequesterRsrc "$app" build/artifact/ServerMonitor.app.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-monitor-unsigned
+          path: build/artifact/ServerMonitor.app.zip
+          if-no-files-found: error
+          retention-days: 7

@@ -33,6 +33,20 @@ The pipeline:
 Run without `--notarize` for a local Developer ID-signed QA artifact. It is not a
 publishable release until notarization succeeds.
 
+If the local Xcode build service is unavailable, dispatch the manual
+`Unsigned macOS release` workflow. Download and expand its
+`ServerMonitor.app.zip` artifact, then feed the app into the same local signing
+pipeline:
+
+```bash
+./scripts/build_release.sh --unsigned-app /absolute/path/ServerMonitor.app --notarize
+```
+
+The hosted job has read-only repository permissions and receives no signing or
+notarization credentials. The local pipeline still performs architecture,
+bundle, nested-payload, signature, team, notarization, staple, and Gatekeeper
+checks.
+
 The older release-script names remain thin compatibility wrappers around this one
 pipeline; they no longer contain independent versions, bundle IDs, or signing logic.
 

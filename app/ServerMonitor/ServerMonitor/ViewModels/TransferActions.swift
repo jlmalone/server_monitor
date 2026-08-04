@@ -282,11 +282,11 @@ final class TransferActionsModel: ObservableObject {
     }
 
     var activeCount: Int {
-        operations.count { $0.state == .running || $0.state == .retrying }
+        operations.filter { $0.state == .running || $0.state == .retrying }.count
     }
 
     var failedCount: Int {
-        operations.count { $0.state == .failed }
+        operations.filter { $0.state == .failed }.count
     }
 
     var needsAttention: Bool { failedCount > 0 }
@@ -389,7 +389,7 @@ final class TransferActionsModel: ObservableObject {
         update(id) { $0.state = .retrying; $0.nextRetryAt = fireAt }
         Self.appendLine(op.logPath, "— attempt \(op.attempt) failed; retrying in \(Int(delay))s —")
         let t = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.fireRetry(id) }
+            Task { @MainActor [weak self] in self?.fireRetry(id) }
         }
         retryTimers[id] = t
     }

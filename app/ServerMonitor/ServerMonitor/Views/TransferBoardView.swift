@@ -652,7 +652,7 @@ final class LogTailer: ObservableObject {
         timer?.invalidate()
         guard live else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.read(path) }
+            Task { @MainActor [weak self] in self?.read(path) }
         }
     }
 

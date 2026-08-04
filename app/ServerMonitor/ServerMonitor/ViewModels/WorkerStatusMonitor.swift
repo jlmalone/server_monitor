@@ -42,7 +42,7 @@ final class WorkerStatusMonitor: ObservableObject {
         self.configured = (config != nil)
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 
@@ -228,7 +228,7 @@ final class TransfersMonitor: ObservableObject {
         timer?.invalidate()
         let delay = (running > 0 || pending > 0) ? activeInterval : idleInterval
         timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 

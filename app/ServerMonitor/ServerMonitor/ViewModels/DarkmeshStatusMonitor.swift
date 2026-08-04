@@ -42,7 +42,7 @@ final class DarkmeshStatusMonitor: ObservableObject {
     func start() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.readNow() }
+            Task { @MainActor [weak self] in self?.readNow() }
         }
     }
 
@@ -186,7 +186,7 @@ final class ProtectionMonitor: ObservableObject {
         let interval = max(10, cfg.pollSeconds ?? pollInterval)
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 

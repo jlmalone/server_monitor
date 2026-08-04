@@ -40,7 +40,7 @@ final class NetworkPostureMonitor: ObservableObject {
             guard decoded.isValid else { throw CocoaError(.fileReadCorruptFile) }
             config = decoded; profiles = decoded.postures ?? []; configured = true; configurationError = nil; refreshProfiles(); refresh()
             let interval = max(10, decoded.pollSeconds ?? 30)
-            timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in Task { @MainActor in self?.refresh() } }
+            timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in Task { @MainActor [weak self] in self?.refresh() } }
         } catch { configured = true; configurationError = "Invalid network.json: \(error.localizedDescription)"; config = nil }
     }
 

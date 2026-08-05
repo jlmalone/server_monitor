@@ -23,6 +23,17 @@ jobs:
       - run: ./tests/test-resource-guard-policy.sh
       - run: ./tests/test-infrastructure-agent-watchdog.sh
       - run: ./tests/test-monitor-health.sh
+      - run: ./tests/test-network-posture.sh
+      - name: Build native app
+        run: |
+          xcodebuild \
+            -project app/ServerMonitor/ServerMonitor.xcodeproj \
+            -scheme ServerMonitor \
+            -configuration Debug \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/ci \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
   cli:
     runs-on: macos-14

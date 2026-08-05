@@ -20,7 +20,7 @@ from **untracked** local files that are **never committed** to this repo:
 Copy `config/network.example.json` to `~/.config/server-monitor/network.json`. It is
 optional: without it, Network Status remains inert. `schema` is currently `1`.
 
-Darkmesh command sources use its schema-2 envelopes: `profiles` returns the profile
+Darkmesh command sources use its schema-2 envelopes: `profiles` contains the profile
 array; `show` returns desired profile, observed status, and producer assessment;
 `topology` returns passive local interfaces, routes, Tailscale health, and cached peer
 state; `probe` is the explicit active peer check. Unknown fields are ignored, but an
@@ -29,8 +29,9 @@ unsupported envelope is unavailable rather than treated as healthy.
 `probeCommand`, `probes`, and `diagnostics` are bounded direct argv arrays. Probes must be read-only;
 use them for peer posture, health, VPN, SSH, and transfer-readiness checks. A failed
 required probe is red; failed optional probes and producer degradation are yellow.
-`postures[].set_command` is the only mutating hook and always presents an explicit
-confirmation before execution. No command is shell-interpolated. Set only values
+`postures[].set_command` and `applyCommand` are the only mutating hooks, and both
+always present an explicit confirmation before execution. No command is
+shell-interpolated. Set only values
 appropriate for the local trusted machine, and do not commit this file.
 
 Command-driven producers may instead supply `profilesCommand`, `statusCommand`,

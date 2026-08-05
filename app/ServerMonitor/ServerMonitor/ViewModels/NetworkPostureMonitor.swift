@@ -53,17 +53,21 @@ final class NetworkPostureMonitor: ObservableObject {
             var decoded: NetworkPostureSnapshot?; var stale: String?
             if let statusPath {
                 do {
-                    decoded = try JSONDecoder().decode(NetworkPostureSnapshot.self, from: Data(contentsOf: URL(fileURLWithPath: statusPath)))
+                    let data = try Data(contentsOf: URL(fileURLWithPath: statusPath))
+                    guard let snapshot = NetworkPostureContract.snapshot(from: data, kind: "darkmesh-posture") else {
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
+                    decoded = snapshot
                     if let generated = decoded?.generatedAt, let age = SnapshotFreshness.age(of: generated), age > max(10, config.maxStatusAgeSeconds ?? 90) { stale = "status stale (\(Int(age))s old)" }
                 } catch { stale = "status unavailable" }
             }
             if let command = config.statusCommand, !command.isEmpty {
                 let run = ProcessRunner.run(command, timeout: 15)
-                if run.succeeded, let fresh = try? JSONDecoder().decode(NetworkPostureSnapshot.self, from: run.data), fresh.schema == 2, fresh.kind == "darkmesh-posture" { decoded = fresh; stale = nil } else { stale = run.failureSummary() ?? "status contract unavailable" }
+                if run.succeeded, let fresh = NetworkPostureContract.snapshot(from: run.data, kind: "darkmesh-posture") { decoded = fresh; stale = nil } else { stale = run.failureSummary() ?? "status contract unavailable" }
             }
             if let command = config.topologyCommand, !command.isEmpty {
                 let run = ProcessRunner.run(command, timeout: 15)
-                if run.succeeded, let topology = try? JSONDecoder().decode(NetworkPostureSnapshot.self, from: run.data), topology.schema == 2, topology.kind == "darkmesh-posture-topology" {
+                if run.succeeded, let topology = NetworkPostureContract.snapshot(from: run.data, kind: "darkmesh-posture-topology") {
                     if decoded == nil { decoded = topology } else { decoded?.merge(topology: topology) }
                     decoded?.mergeActivePeers(cachedActivePeers)
                 } else if !run.succeeded && decoded == nil {
@@ -80,12 +84,14 @@ final class NetworkPostureMonitor: ObservableObject {
         guard let command = config?.profilesCommand, !command.isEmpty else { return }
         Task.detached { [weak self] in
             let run = ProcessRunner.run(command, timeout: 15)
-            let envelope = try? JSONDecoder().decode(ProfilesEnvelope.self, from: run.data)
-            let producerValues = (envelope?.schema == 2 && envelope?.kind == "darkmesh-posture-profiles") ? envelope?.profiles : nil
-            let legacyValues = try? JSONDecoder().decode([NetworkPostureChoice].self, from: run.data)
-            let values = (producerValues ?? legacyValues ?? []).filter(\.isValid)
+            let values = NetworkPostureContract.profiles(from: run.data) ?? []
             guard let self else { return }
-            await MainActor.run { self.profiles = values; self.actionResult = run.succeeded ? nil : run.failureSummary() }
+            await MainActor.run {
+                self.profiles = values
+                self.actionResult = run.succeeded && !values.isEmpty
+                    ? nil
+                    : (run.failureSummary() ?? "profiles contract unavailable")
+            }
         }
     }
 
@@ -102,7 +108,7 @@ final class NetworkPostureMonitor: ObservableObject {
         }
     }
     func setPosture(_ choice: NetworkPostureChoice) {
-        guard choice.transition?.apply != "refuse", (choice.capabilities ?? [:]).values.allSatisfy({ $0 }) else { actionResult = "\(choice.label): required capability unavailable"; return }
+        guard choice.canApply else { actionResult = "\(choice.label): producer reports apply unavailable"; return }
         let argv = config?.applyCommand.flatMap { NetworkArgv.applying($0, profile: choice.id) } ?? choice.setCommand
         guard !argv.isEmpty else { actionResult = "\(choice.label): apply command unavailable"; return }
         execute(id: choice.id, argv: argv, timeout: choice.timeoutSeconds ?? 360)
@@ -131,10 +137,10 @@ final class NetworkPostureMonitor: ObservableObject {
         let timeout = config?.activeProbeTimeoutSeconds ?? 120
         Task.detached { [weak self] in
             let run = ProcessRunner.run(command, timeout: timeout)
-            let envelope = try? JSONDecoder().decode(NetworkPostureSnapshot.self, from: run.data)
+            let envelope = NetworkPostureContract.snapshot(from: run.data, kind: "darkmesh-posture-probe")
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                if run.succeeded, let envelope, envelope.schema == 2, envelope.kind == "darkmesh-posture-probe" { self.activeProbePeers = envelope.peers; if self.snapshot == nil { self.snapshot = envelope } else { self.snapshot?.mergeActivePeers(envelope.peers) }; self.lastActiveProbeAt = Date(); self.lastUpdated = Date(); self.actionResult = "active-peer-probe: completed" }
+                if run.succeeded, let envelope { self.activeProbePeers = envelope.peers; if self.snapshot == nil { self.snapshot = envelope } else { self.snapshot?.mergeActivePeers(envelope.peers) }; self.lastActiveProbeAt = Date(); self.lastUpdated = Date(); self.actionResult = "active-peer-probe: completed" }
                 else { self.actionResult = "active-peer-probe: \(run.failureSummary() ?? "failed")" }
                 self.runningActionID = nil
             }

@@ -14,13 +14,60 @@ struct NetworkStatusWindow: View {
             else { content }
         }
         .frame(minWidth: 680, minHeight: 520)
-        .confirmationDialog("Apply network posture?", isPresented: $confirmingPosture, titleVisibility: .visible) { Button("Apply \(pendingPosture?.label ?? "posture")", role: .destructive) { if let choice = pendingPosture { monitor.setPosture(choice) }; pendingPosture = nil }; Button("Cancel", role: .cancel) { pendingPosture = nil } } message: { Text(pendingPosture?.degraded ?? "This runs the configured direct command. It may change network connectivity.") }
+        .confirmationDialog("Apply network posture?", isPresented: $confirmingPosture, titleVisibility: .visible) { Button("Apply \(pendingPosture?.label ?? "posture")", role: .destructive) { if let choice = pendingPosture { monitor.setPosture(choice) }; pendingPosture = nil }; Button("Cancel", role: .cancel) { pendingPosture = nil } } message: { Text(pendingPosture?.confirmationText ?? "This runs the configured direct command. It may change network connectivity.") }
     }
     private var content: some View { ScrollView { VStack(alignment: .leading, spacing: 14) { picker; posture; topology; peers; healthProbes; diagnostics; if let result = monitor.actionResult { Text(result).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) } }.padding(14) } }
-    @ViewBuilder private var picker: some View { if !monitor.choices.isEmpty { GroupBox("Desired posture") { VStack(alignment: .leading, spacing: 8) { Picker("Profile", selection: $selectedProfileID) { ForEach(monitor.choices) { Text($0.label).tag($0.id) } }.onAppear { selectedProfileID = monitor.snapshot?.desired ?? monitor.choices.first?.id ?? "" }.task(id: monitor.snapshot?.desired) { if let value=monitor.snapshot?.desired { selectedProfileID=value } }; HStack { if let choice = monitor.choices.first(where: { $0.id == selectedProfileID }) { Text(choice.degraded ?? "No consequence published").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Apply") { pendingPosture = choice; confirmingPosture = true }.disabled(monitor.runningActionID != nil || choice.transition?.apply == "refuse" || (choice.capabilities ?? [:]).values.contains(false)) }; }.padding(.top, 2) } } } }
-    private var posture: some View { GroupBox("Posture") { Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 7) { row("Desired", monitor.snapshot?.desired ?? "unavailable"); row("Observed", monitor.snapshot?.observed?.compact ?? "unavailable"); row("Assessment", monitor.snapshot?.assessment.map { "\($0.severity) · \($0.reason)" } ?? "unknown"); row("Degradation", monitor.snapshot?.degradation.joined(separator: ", ") ?? "none"); if let stale = monitor.staleReason { row("Availability", stale) } }.padding(.top, 2) } }
+    @ViewBuilder private var picker: some View {
+        if !monitor.choices.isEmpty {
+            GroupBox("Desired posture") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Profile", selection: $selectedProfileID) {
+                        ForEach(monitor.choices) { Text($0.label).tag($0.id) }
+                    }
+                    .onAppear { selectedProfileID = monitor.snapshot?.desired ?? monitor.choices.first?.id ?? "" }
+                    .task(id: monitor.snapshot?.desired) {
+                        if let value = monitor.snapshot?.desired { selectedProfileID = value }
+                    }
+                    if let choice = monitor.choices.first(where: { $0.id == selectedProfileID }) {
+                        Text(profilePolicy(choice))
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text(choice.confirmationText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button(choice.canApply ? "Apply" : "Unavailable") {
+                                pendingPosture = choice
+                                confirmingPosture = true
+                            }
+                            .disabled(monitor.runningActionID != nil || !choice.canApply)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+    private var posture: some View {
+        GroupBox("Posture") {
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 7) {
+                row("Desired", monitor.snapshot?.desired ?? "unavailable")
+                row("Observed", monitor.snapshot?.observed?.compact ?? "unavailable")
+                row("Assessment", monitor.snapshot?.assessment.map { "\($0.severity) · \($0.reason)" } ?? "unknown")
+                if let assessment = monitor.snapshot?.assessment {
+                    assessmentRow("Required", values: assessment.required, expected: true)
+                    assessmentRow("Preferred", values: assessment.preferred, expected: true)
+                    assessmentRow("Forbidden", values: assessment.forbidden, expected: false)
+                }
+                row("Degradation", monitor.snapshot?.degradation.joined(separator: ", ") ?? "none")
+                if let stale = monitor.staleReason { row("Availability", stale) }
+            }
+            .padding(.top, 2)
+        }
+    }
     private var topology: some View { GroupBox("Local topology") { VStack(alignment: .leading, spacing: 7) { TopologyGraph(snapshot: monitor.snapshot).frame(height: 130); if let ts=monitor.snapshot?.localTailscale { Text("Tailscale: \(ts.backend ?? "unknown") · control \(ts.controlHealthy == true ? "healthy" : "unknown") · \(ts.selfAddresses?.joined(separator: ", ") ?? "no self address")").font(.caption); if !(ts.healthWarnings ?? []).isEmpty { Text(ts.healthWarnings!.joined(separator: ", ")).font(.caption).foregroundStyle(.yellow) } }; if monitor.snapshot?.interfaces.isEmpty != false { Text("No interface topology published").foregroundStyle(.secondary) }; ForEach(monitor.snapshot?.interfaces ?? []) { iface in HStack { Image(systemName: "network"); Text(iface.name).font(.body.monospaced()); Text(iface.state ?? "unknown").foregroundStyle(.secondary); Spacer(); Text((iface.addresses ?? []).joined(separator: ", ")).font(.caption).foregroundStyle(.secondary) } }; ForEach(monitor.snapshot?.routes ?? []) { route in HStack(spacing: 5) { Image(systemName: "arrow.right").foregroundStyle(.secondary); Text(route.destination).font(.caption.monospaced()); Text("via \(route.gateway ?? "?")").font(.caption).foregroundStyle(.secondary); Text(route.interface ?? "?").font(.caption.monospaced()).foregroundStyle(.secondary) } } }.padding(.top, 2) } }
-    private var peers: some View { GroupBox("Tailscale peers") { VStack(alignment: .leading, spacing: 7) { if monitor.snapshot?.peers.isEmpty != false { Text("No peer data published").foregroundStyle(.secondary) }; ForEach(monitor.snapshot?.peers ?? []) { peer in VStack(alignment: .leading, spacing: 3) { HStack { Circle().fill(peer.online == true ? .green : .secondary).frame(width: 8, height: 8); Text(peer.name); Spacer(); tag(peer.pingPath ?? peer.relay ?? "no route"); Text(peer.lastSeen ?? "unknown").font(.caption).foregroundStyle(.secondary) }; Text("route \(peer.route?.interface ?? "?") · endpoint \(peer.directEndpoint ?? "none") · ping \(peer.ping ?? "not run") · tcp \(peer.tcp22 ?? "not run") · ssh \(peer.ssh ?? "not run")").font(.caption.monospaced()); if let report=peer.remoteReport { let failed=report.audit?.result?.checks?.filter { $0.ok == false }.compactMap(\.id) ?? []; Text("remote desired \(report.desiredProfile ?? "unknown") · \(report.observed?.compact ?? "state unavailable")").font(.caption.monospaced()); Text("audit \(report.audit?.ok == true ? "pass" : "fail")\(failed.isEmpty ? "" : " [\(failed.joined(separator: ", "))]") · transfer client \(report.transferReadiness?.transferSummary ?? "unknown")").font(.caption.monospaced()); if !(report.tailscale?.healthWarnings ?? []).isEmpty { Text(report.tailscale!.healthWarnings!.joined(separator: ", ")).font(.caption).foregroundStyle(.yellow) } } } } }.padding(.top, 2) } }
+    private var peers: some View { GroupBox("Tailscale peers") { VStack(alignment: .leading, spacing: 7) { if monitor.snapshot?.peers.isEmpty != false { Text("No peer data published").foregroundStyle(.secondary) }; ForEach(monitor.snapshot?.peers ?? []) { peer in VStack(alignment: .leading, spacing: 3) { HStack { Circle().fill(peer.online == true ? .green : .secondary).frame(width: 8, height: 8); Text(peer.name); Spacer(); tag(peer.pingPath ?? peer.relay ?? "no route"); Text(peer.lastSeen ?? "unknown").font(.caption).foregroundStyle(.secondary) }; Text("route \(peer.route?.interface ?? "?") · endpoint \(peer.directEndpoint ?? "none") · ping \(peer.ping ?? "not run") · tcp \(peer.tcp22 ?? "not run") · ssh \(peer.ssh ?? "not run")").font(.caption.monospaced()); let peerWarnings = ([peer.reason].compactMap { $0 } + (peer.warnings ?? [])); if !peerWarnings.isEmpty { Text(peerWarnings.joined(separator: ", ")).font(.caption).foregroundStyle(.yellow) }; if let report=peer.remoteReport { let failed=report.audit?.result?.checks?.filter { $0.ok == false }.compactMap(\.id) ?? []; Text("remote desired \(report.desiredProfile ?? "unknown") · \(report.observed?.compact ?? "state unavailable")").font(.caption.monospaced()); Text("audit \(report.audit?.ok == true ? "pass" : "fail")\(failed.isEmpty ? "" : " [\(failed.joined(separator: ", "))]") · transfer client \(report.transferReadiness?.transferSummary ?? "unknown")").font(.caption.monospaced()); if !(report.tailscale?.healthWarnings ?? []).isEmpty { Text(report.tailscale!.healthWarnings!.joined(separator: ", ")).font(.caption).foregroundStyle(.yellow) } } } } }.padding(.top, 2) } }
     private var healthProbes: some View {
         let results: [NetworkProbeResult] = monitor.probes
         return GroupBox("Read-only health probes") {
@@ -34,6 +81,31 @@ struct NetworkStatusWindow: View {
     }
     @ViewBuilder private var diagnostics: some View { if !monitor.diagnostics.isEmpty || !monitor.logSources.isEmpty { GroupBox("Diagnostics and logs") { VStack(alignment: .leading) { HStack { ForEach(monitor.diagnostics) { command in Button(command.label) { monitor.run(command) }.disabled(monitor.runningActionID != nil) }; ForEach(monitor.logSources) { source in Button("Refresh \(source.label)") { monitor.refreshLog(source) } }; Spacer() }; if !monitor.diagnosticLog.isEmpty { Text(monitor.diagnosticLog.joined(separator: "\n")).font(.caption.monospaced()).lineLimit(8).textSelection(.enabled) }; ForEach(monitor.logSources) { source in if let output = monitor.logOutput[source.id] { Text("\(source.label) · \(output.timestamp.formatted() )\n\(output.text)").font(.caption.monospaced()).lineLimit(8).textSelection(.enabled) } } }.padding(.top, 2) } } }
     private func row(_ title: String, _ value: String) -> some View { GridRow { Text(title).foregroundStyle(.secondary); Text(value).textSelection(.enabled) } }
+    @ViewBuilder private func assessmentRow(_ title: String, values: [String: Bool?], expected: Bool) -> some View {
+        if !values.isEmpty { row(title, assessmentSummary(values, expected: expected)) }
+    }
+    private func assessmentSummary(_ values: [String: Bool?], expected: Bool) -> String {
+        values.sorted { $0.key < $1.key }.map { key, value in
+            guard let value else { return "\(key)=unknown" }
+            if value == expected { return "\(key)=ok" }
+            return "\(key)=\(expected ? "missing" : "present")"
+        }.joined(separator: ", ")
+    }
+    private func profilePolicy(_ choice: NetworkPostureChoice) -> String {
+        let required = enabledKeys(choice.required)
+        let preferred = enabledKeys(choice.preferred)
+        let forbidden = enabledKeys(choice.forbidden)
+        let unavailable = (choice.capabilities ?? [:]).filter { !$0.value }.keys.sorted()
+        let policy = [
+            "required: \(required.isEmpty ? "none" : required.joined(separator: ", "))",
+            "preferred: \(preferred.isEmpty ? "none" : preferred.joined(separator: ", "))",
+            "forbidden: \(forbidden.isEmpty ? "none" : forbidden.joined(separator: ", "))"
+        ]
+        return (policy + (unavailable.isEmpty ? [] : ["unavailable capability: \(unavailable.joined(separator: ", "))"])).joined(separator: " · ")
+    }
+    private func enabledKeys(_ values: [String: Bool]?) -> [String] {
+        (values ?? [:]).filter(\.value).keys.sorted()
+    }
     private func tag(_ text: String) -> some View { Text(text).font(.caption2).padding(.horizontal, 5).padding(.vertical, 2).background(.quaternary, in: Capsule()) }
     private func badge(_ status: NetworkPostureClass) -> some View { Text(label(status)).font(.caption.bold()).padding(.horizontal, 6).padding(.vertical, 3).foregroundStyle(color(status)).background(color(status).opacity(0.14), in: Capsule()) }
     private func label(_ status: NetworkPostureClass) -> String { switch status { case .healthy: return "OK"; case .degraded: return "DEGRADED"; case .failed: return "REQUIRED FAILED"; case .unavailable: return "UNAVAILABLE"; case .stale: return "STALE" } }

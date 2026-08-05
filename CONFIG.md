@@ -41,6 +41,9 @@ explicit user actions. `applyCommand` is one argv template and must include a wh
 Profiles may carry `id`, `title`, required/preferred/forbidden maps, priority,
 degraded state, capabilities, and a connectivity consequence. `logSources` read a
 capped local-file tail or run a bounded log command only after Refresh.
+Capability maps are descriptive producer telemetry. The versioned
+`transition.apply: "refuse"` field is the authoritative apply gate, so an unrelated
+false capability does not disable an otherwise supported profile.
 
 ## Worker config
 

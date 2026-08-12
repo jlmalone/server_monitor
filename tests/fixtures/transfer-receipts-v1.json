@@ -6,22 +6,69 @@
       "transferId": "transfer-001",
       "attemptId": "attempt-001",
       "queueEntryId": "queue-001",
-      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
+      "sourceAuthority": { "label": "source-a" },
+      "destinationAuthority": { "label": "destination-a" },
+      "route": { "generation": 1, "fingerprint": "route-fingerprint-01" },
+      "expectedBytes": 10,
+      "timestamps": {
+        "commandAcceptedAt": "2026-08-12T00:00:00Z",
+        "queueAdmittedAt": "2026-08-12T00:00:01Z",
+        "lastObservedAt": "2026-08-12T00:00:02Z"
+      },
       "state": "DEFERRED"
     },
     {
       "schema": "choam.transfer-receipt.v1",
       "transferId": "transfer-002",
       "attemptId": "attempt-002",
-      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
+      "sourceAuthority": { "label": "source-a" },
+      "destinationAuthority": { "label": "destination-a" },
+      "route": { "generation": 2, "fingerprint": "route-fingerprint-02" },
+      "expectedBytes": 10,
+      "expectedFiles": 1,
+      "declaredHashes": [{ "algorithm": "SHA-256", "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }],
+      "destinationEvidence": {
+        "authority": { "label": "destination-a" },
+        "observedAt": "2026-08-12T00:00:05Z",
+        "observedBytes": 10,
+        "observedFiles": 1,
+        "observedHashes": [{ "algorithm": "SHA-256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }],
+        "proof": {
+          "scheme": "LOCAL_AUTHORITATIVE_PROBE_V1",
+          "version": 1,
+          "destinationAuthorityKeyFingerprint": "destination-proof-01",
+          "transferId": "transfer-002",
+          "attemptId": "attempt-002",
+          "route": { "generation": 2, "fingerprint": "route-fingerprint-02" },
+          "localAuthoritativeProbeAttestation": "attestation-002"
+        }
+      },
+      "timestamps": {
+        "commandAcceptedAt": "2026-08-12T00:00:00Z",
+        "queueAdmittedAt": "2026-08-12T00:00:01Z",
+        "startedAt": "2026-08-12T00:00:02Z",
+        "verificationStartedAt": "2026-08-12T00:00:03Z",
+        "destinationCommittedAt": "2026-08-12T00:00:04Z",
+        "completedAt": "2026-08-12T00:00:05Z",
+        "lastObservedAt": "2026-08-12T00:00:05Z"
+      },
       "state": "COMPLETED"
     },
     {
       "schema": "choam.transfer-receipt.v1",
       "transferId": "transfer-003",
       "attemptId": "attempt-003",
-      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
-      "state": "FAILED"
+      "sourceAuthority": { "label": "source-a" },
+      "destinationAuthority": { "label": "destination-a" },
+      "route": { "generation": 3, "fingerprint": "route-fingerprint-03" },
+      "expectedFiles": 1,
+      "timestamps": {
+        "commandAcceptedAt": "2026-08-12T00:00:00Z",
+        "failedAt": "2026-08-12T00:00:01Z",
+        "lastObservedAt": "2026-08-12T00:00:01Z"
+      },
+      "state": "FAILED",
+      "failureCode": "TRANSFER_FAILED"
     }
   ]
 }

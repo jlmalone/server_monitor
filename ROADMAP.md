@@ -87,10 +87,11 @@ progress. Either failure is rendered inline and pulls the combined tint off gree
 
 ### Generic receipt consumer V1 — implemented; verification pending
 
-An optional per-source receipt file or bounded argv source consumes the additive
+An optional per-source receipt file (capped at 256 KiB before parsing) or bounded argv source consumes the additive
 `choam.transfer-receipt.v1` / `choam.transfer-receipts.v1` contract without
 altering legacy queue snapshots. The app retains only opaque identifiers and
-lifecycle state. It treats process exit zero and unverified `COMPLETED` receipts
+lifecycle state. It validates the public V1 authorities, route, content expectations,
+Instant timestamps, and required completion lineage/evidence before projection. It treats process exit zero and unverified `COMPLETED` receipts
 as provisional, exposes deferred/in-progress/failed states, and fails closed on
 unavailable or malformed configured receipt data. Cryptographic destination-proof
 verification remains a future trusted-boundary integration.

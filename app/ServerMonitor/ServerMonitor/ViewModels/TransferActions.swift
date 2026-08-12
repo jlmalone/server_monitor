@@ -225,10 +225,10 @@ final class ChickletStore: ObservableObject {
 // MARK: - Transfer operations engine (Logs tab)
 
 enum TransferMode: String { case copy = "Copy", move = "Move" }
-/// `succeeded` means only that the configured process exited zero. It is not a
+/// `provisional` means only that the configured process exited zero. It is not a
 /// destination-delivery assertion; only a trusted receipt-verification boundary
 /// may make a delivery claim.
-enum TransferState { case running, retrying, succeeded, failed, stopped }
+enum TransferState { case running, retrying, provisional, failed, stopped }
 
 struct TransferOperation: Identifiable {
     let id: String
@@ -292,7 +292,11 @@ final class TransferActionsModel: ObservableObject {
         operations.filter { $0.state == .failed }.count
     }
 
-    var needsAttention: Bool { failedCount > 0 }
+    /// An exit-zero Manager command is provisional until a trusted boundary
+    /// proves the destination; it must keep the aggregate status off green.
+    var needsAttention: Bool {
+        operations.contains { $0.state == .failed || $0.state == .provisional }
+    }
 
     /// True when `mode` is available (Copy always; Move only if enabled).
     func supports(_ mode: TransferMode) -> Bool { mode == .copy || canMove }
@@ -343,10 +347,10 @@ final class TransferActionsModel: ObservableObject {
     }
 
     func clearFinished() {
-        for op in operations where op.state == .succeeded || op.state == .failed || op.state == .stopped {
+        for op in operations where op.state == .provisional || op.state == .failed || op.state == .stopped {
             opArgs[op.id] = nil
         }
-        operations.removeAll { $0.state == .succeeded || $0.state == .failed || $0.state == .stopped }
+        operations.removeAll { $0.state == .provisional || $0.state == .failed || $0.state == .stopped }
     }
 
     // MARK: attempt loop
@@ -380,7 +384,7 @@ final class TransferActionsModel: ObservableObject {
 
     private func completed(_ id: String, ok: Bool) {
         guard let op = operations.first(where: { $0.id == id }) else { return }
-        if ok { update(id) { $0.state = .succeeded; $0.nextRetryAt = nil }; return }
+        if ok { update(id) { $0.state = .provisional; $0.nextRetryAt = nil }; return }
         if op.state == .stopped { return }
         guard op.attempt < op.maxAttempts else {
             update(id) { $0.state = .failed; $0.nextRetryAt = nil }

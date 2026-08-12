@@ -137,6 +137,31 @@ struct TransfersSource: Codable {
     }
 }
 
+/// Receipt files are data-only inputs. Read at most 256 KiB plus one sentinel
+/// byte, so an oversized or unreadable configured file is unavailable before
+/// JSON parsing and never allocates the entire file. Command sources continue
+/// through ProcessRunner, which already bounds captured output.
+enum ReceiptFileReader {
+    static let maximumBytes = 256 * 1024
+
+    static func read(url: URL, maximumBytes: Int = maximumBytes) -> Data? {
+        guard maximumBytes >= 0, maximumBytes < Int.max,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return bounded(maximumBytes: maximumBytes) { count in
+            try handle.read(upToCount: count) ?? Data()
+        }
+    }
+
+    /// Callback seam for focused tests: the production reader asks for only
+    /// `maximumBytes + 1`, then rejects rather than parses an oversize input.
+    static func bounded(maximumBytes: Int, read: (Int) throws -> Data) -> Data? {
+        guard maximumBytes >= 0, maximumBytes < Int.max,
+              let data = try? read(maximumBytes + 1), data.count <= maximumBytes else { return nil }
+        return data
+    }
+}
+
 /// Optional reader for the transfer tool's JSON-lines history log, surfaced in
 /// the Transfer History window (distinct from the live queue above). `command`
 /// is argv that prints one record per line (executed directly with a deadline); it lives
@@ -358,7 +383,7 @@ final class TransfersMonitor: ObservableObject {
     private nonisolated static func readReceiptSource(_ source: TransfersSource, timeout: TimeInterval) -> Data? {
         if let configuredPath = source.receiptFile, !configuredPath.isEmpty {
             let path = (configuredPath as NSString).expandingTildeInPath
-            return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+            return ReceiptFileReader.read(url: URL(fileURLWithPath: path))
         }
         guard let command = source.receiptCommand, !command.isEmpty else { return nil }
         let result = ProcessRunner.run(command, timeout: timeout, includeStandardError: false)

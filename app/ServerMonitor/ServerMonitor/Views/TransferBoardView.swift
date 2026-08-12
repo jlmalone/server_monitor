@@ -154,7 +154,7 @@ struct ManagerView: View {
                 Text(operation.title).font(.callout.bold()).lineLimit(1).truncationMode(.middle)
                 Text(operationSummary(operation))
                     .font(.caption2)
-                    .foregroundColor(operation.state == .failed ? .red : .secondary)
+                    .foregroundColor(operation.state == .failed ? .red : (operation.state == .provisional ? .orange : .secondary))
             }
             Spacer()
             Button("View Log", action: showLogs)
@@ -171,7 +171,7 @@ struct ManagerView: View {
             return "\(operation.mode.rawValue) attempt \(operation.attempt)/\(operation.maxAttempts) is running"
         case .retrying:
             return "Attempt \(operation.attempt)/\(operation.maxAttempts) failed; waiting to retry"
-        case .succeeded:
+        case .provisional:
             return "\(operation.mode.rawValue) command exited 0; delivery unverified"
         case .failed:
             return "\(operation.mode.rawValue) failed after \(operation.attempt) attempts"
@@ -545,7 +545,7 @@ struct TransferLogsView: View {
     private var selectedOp: TransferOperation? { actions.operations.first { $0.id == selection } }
 
     private var hasFinished: Bool {
-        actions.operations.contains { $0.state == .succeeded || $0.state == .failed || $0.state == .stopped }
+        actions.operations.contains { $0.state == .provisional || $0.state == .failed || $0.state == .stopped }
     }
 
     var body: some View {
@@ -555,7 +555,7 @@ struct TransferLogsView: View {
                     Spacer()
                     Button { actions.clearFinished() } label: { Label("Clear finished", systemImage: "trash") }
                         .buttonStyle(.borderless).font(.caption)
-                        .help("Remove succeeded/failed/stopped transfers from this list (logs stay on disk)")
+                        .help("Remove completed/failed/stopped transfers from this list (logs stay on disk)")
                 }
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 Divider()
@@ -616,7 +616,7 @@ struct TransferLogsView: View {
         switch s {
         case .running:   return "running"
         case .retrying:  return "retrying after a failure"
-        case .succeeded: return "succeeded"
+        case .provisional: return "delivery unverified"
         case .failed:    return "failed"
         case .stopped:   return "stopped"
         }
@@ -631,7 +631,7 @@ struct TransferStateDot: View {
             switch state {
             case .running:   ProgressView().controlSize(.small)
             case .retrying:  Image(systemName: "clock.arrow.circlepath").foregroundColor(.orange)
-            case .succeeded: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+            case .provisional: Image(systemName: "exclamationmark.circle.fill").foregroundColor(.orange)
             case .failed:    Image(systemName: "xmark.octagon.fill").foregroundColor(.red)
             case .stopped:   Image(systemName: "minus.circle.fill").foregroundColor(.secondary)
             }
@@ -707,7 +707,7 @@ struct LogTailView: View {
         switch op.state {
         case .running:   return "attempt \(op.attempt)/\(op.maxAttempts) · running"
         case .retrying:  return "attempt \(op.attempt)/\(op.maxAttempts) failed · waiting to retry"
-        case .succeeded: return "exit 0 on attempt \(op.attempt); delivery unverified"
+        case .provisional: return "exit 0 on attempt \(op.attempt); delivery unverified"
         case .failed:    return "failed after \(op.attempt) attempts"
         case .stopped:   return "stopped after \(op.attempt) attempts"
         }

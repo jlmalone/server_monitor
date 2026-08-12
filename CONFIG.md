@@ -91,7 +91,7 @@ Schema (`config/transfers.example.json`):
 | `sources[].healthFile` | optional file whose modification time proves the queue producer or scheduler is alive |
 | `sources[].maxHealthAgeSeconds` | heartbeat age limit (default 240 seconds, minimum 10) |
 | `sources[].maxActiveSnapshotAgeSeconds` | maximum age of `generatedAt` while queue work is running or pending (default 30 seconds, minimum 10) |
-| `sources[].receiptFile` | optional local atomic JSON file containing one `choam.transfer-receipt.v1` receipt or a `choam.transfer-receipts.v1` envelope |
+| `sources[].receiptFile` | optional local atomic JSON file, capped at 256 KiB before parsing, containing one `choam.transfer-receipt.v1` receipt or a `choam.transfer-receipts.v1` envelope |
 | `sources[].receiptCommand` | optional bounded argv fallback that prints the same receipt JSON directly; used only when `receiptFile` is absent |
 | `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **History** tab in the **Manager** window (opened from the dropdown). Omit to leave it unconfigured. |
 | `history.clearCommand` | optional argv that prunes the history log (e.g. drop FAILED entries); enables a **Clean** button in the History tab. Omit to leave history read-only |
@@ -123,16 +123,22 @@ only opaque transfer, attempt, and optional queue-entry IDs plus the lifecycle
 state. It never renders routes, paths, hosts, accounts, proof material, hashes,
 or failure details.
 
-The app is intentionally **not** a destination-evidence verifier. It maps
+The app is intentionally **not** a destination-evidence verifier. It validates
+the V1 authorities, route, content expectations, real ISO-8601 timestamps, and
+state-dependent lineage before retaining only its safe display projection. It maps
 `COMMAND_ACCEPTED`, `QUEUE_ADMITTED`, and `DEFERRED` to pending; `ACTIVE` and
 the verification/commit states to in progress; and `FAILED`/`CANCELLED` to
 attention. Even a receipt whose producer state is `COMPLETED` displays as
-**destination evidence required**, never delivered. An unreadable, unsupported,
-or malformed receipt source is shown as receipt unavailable/malformed; an
+**destination evidence required**, never delivered. An unreadable, oversized,
+unsupported, or malformed receipt source is shown as receipt unavailable/malformed; an
 unverified `COMPLETED` receipt is likewise attention-required. Both pull the
 menu-bar transfer status off green. This is fail-closed: it supplies no
 delivery evidence and does not change the legacy queue snapshot behavior when no
 receipt source is configured.
+
+Manager transfer commands remain separate from receipt sources: exit zero means
+only **delivery unverified** until trusted destination proof exists, and keeps the
+combined menu-bar tint off green.
 
 The Manager window's **History** tab reads `history.command`, which must print **one
 JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",

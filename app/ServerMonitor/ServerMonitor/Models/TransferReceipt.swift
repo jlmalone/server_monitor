@@ -196,18 +196,10 @@ enum TransferReceiptDecoder {
     }
 
     private static func validStateLineage(_ state: TransferReceiptState, timeline: [String: Date]) -> Bool {
-        let required: [String]
-        switch state {
-        case .commandAccepted: required = ["commandAcceptedAt"]
-        case .queueAdmitted, .deferred: required = ["commandAcceptedAt", "queueAdmittedAt", "lastObservedAt"]
-        case .active: required = ["commandAcceptedAt", "queueAdmittedAt", "startedAt", "lastObservedAt"]
-        case .verifyingBytes, .verifyingFiles: required = ["commandAcceptedAt", "queueAdmittedAt", "startedAt", "verificationStartedAt", "lastObservedAt"]
-        case .destinationCommitted: required = ["commandAcceptedAt", "queueAdmittedAt", "startedAt", "verificationStartedAt", "destinationCommittedAt", "lastObservedAt"]
-        case .completed: required = ["commandAcceptedAt", "queueAdmittedAt", "startedAt", "verificationStartedAt", "destinationCommittedAt", "completedAt", "lastObservedAt"]
-        case .failed: required = ["commandAcceptedAt", "failedAt", "lastObservedAt"]
-        case .cancelled: required = ["commandAcceptedAt", "cancelledAt", "lastObservedAt"]
-        }
-        return required.allSatisfy { timeline[$0] != nil }
+        guard state == .completed else { return true }
+        let completedLineage = ["commandAcceptedAt", "queueAdmittedAt", "startedAt", "verificationStartedAt",
+                                "destinationCommittedAt", "completedAt", "lastObservedAt"]
+        return completedLineage.allSatisfy { timeline[$0] != nil }
     }
 
     private static func validOptionalFields(_ object: [String: Any]) -> Bool {
@@ -216,9 +208,6 @@ enum TransferReceiptDecoder {
               object["failureCode"] == nil || valid(object["failureCode"] as? String, expression: failureCode),
               validPriorAttempts(object["priorAttempts"]), validObservationIDs(object["appliedObservationIds"]),
               object["lastAppliedObservationSequence"] == nil || (sequence != nil && sequence! < Int64.max) else { return false }
-        if object["state"] as? String == TransferReceiptState.failed.rawValue {
-            return valid(object["failureCode"] as? String, expression: failureCode)
-        }
         return true
     }
 

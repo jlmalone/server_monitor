@@ -11,11 +11,22 @@
       "route": { "generation": 1, "fingerprint": "route-fingerprint-01" },
       "expectedBytes": 10,
       "timestamps": {
-        "commandAcceptedAt": "2026-08-12T00:00:00Z",
-        "queueAdmittedAt": "2026-08-12T00:00:01Z",
-        "lastObservedAt": "2026-08-12T00:00:02Z"
+        "commandAcceptedAt": "2026-08-12T00:00:00Z"
       },
       "state": "DEFERRED"
+    },
+    {
+      "schema": "choam.transfer-receipt.v1",
+      "transferId": "transfer-004",
+      "attemptId": "attempt-004",
+      "sourceAuthority": { "label": "source-a" },
+      "destinationAuthority": { "label": "destination-a" },
+      "route": { "generation": 4, "fingerprint": "route-fingerprint-04" },
+      "expectedBytes": 10,
+      "timestamps": {
+        "commandAcceptedAt": "2026-08-12T00:00:00Z"
+      },
+      "state": "ACTIVE"
     },
     {
       "schema": "choam.transfer-receipt.v1",
@@ -63,12 +74,22 @@
       "route": { "generation": 3, "fingerprint": "route-fingerprint-03" },
       "expectedFiles": 1,
       "timestamps": {
-        "commandAcceptedAt": "2026-08-12T00:00:00Z",
-        "failedAt": "2026-08-12T00:00:01Z",
-        "lastObservedAt": "2026-08-12T00:00:01Z"
+        "commandAcceptedAt": "2026-08-12T00:00:00Z"
       },
-      "state": "FAILED",
-      "failureCode": "TRANSFER_FAILED"
+      "state": "FAILED"
+    },
+    {
+      "schema": "choam.transfer-receipt.v1",
+      "transferId": "transfer-005",
+      "attemptId": "attempt-005",
+      "sourceAuthority": { "label": "source-a" },
+      "destinationAuthority": { "label": "destination-a" },
+      "route": { "generation": 5, "fingerprint": "route-fingerprint-05" },
+      "expectedFiles": 1,
+      "timestamps": {
+        "commandAcceptedAt": "2026-08-12T00:00:00Z"
+      },
+      "state": "CANCELLED"
     }
   ]
 }

@@ -85,6 +85,16 @@ uses its bounded `generatedAt` age as direct liveness proof, so a long supervise
 transfer is not marked stale merely because its scheduler invocation is still in
 progress. Either failure is rendered inline and pulls the combined tint off green.
 
+### Generic receipt consumer V1 — implemented; verification pending
+
+An optional per-source receipt file or bounded argv source consumes the additive
+`choam.transfer-receipt.v1` / `choam.transfer-receipts.v1` contract without
+altering legacy queue snapshots. The app retains only opaque identifiers and
+lifecycle state. It treats process exit zero and unverified `COMPLETED` receipts
+as provisional, exposes deferred/in-progress/failed states, and fails closed on
+unavailable or malformed configured receipt data. Cryptographic destination-proof
+verification remains a future trusted-boundary integration.
+
 ## Signed infrastructure agent — shipped
 
 One `SMAppService` LaunchAgent bundled and signed with Server Monitor owns the

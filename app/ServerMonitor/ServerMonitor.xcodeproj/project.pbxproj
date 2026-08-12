@@ -36,6 +36,7 @@
 		A101 /* NetworkPosture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201 /* NetworkPosture.swift */; };
 		A102 /* NetworkPostureMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202 /* NetworkPostureMonitor.swift */; };
 		A103 /* NetworkStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203 /* NetworkStatusView.swift */; };
+		A104 /* TransferReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204 /* TransferReceipt.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +104,7 @@
 		A201 /* NetworkPosture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPosture.swift; sourceTree = "<group>"; };
 		A202 /* NetworkPostureMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPostureMonitor.swift; sourceTree = "<group>"; };
 		A203 /* NetworkStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkStatusView.swift; sourceTree = "<group>"; };
+		A204 /* TransferReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferReceipt.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +163,7 @@
 				102 /* Service.swift */,
 				107 /* DarkmeshStatus.swift */,
 				A201 /* NetworkPosture.swift */,
+				A204 /* TransferReceipt.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -338,6 +341,7 @@
 				A101 /* NetworkPosture.swift in Sources */,
 				A102 /* NetworkPostureMonitor.swift in Sources */,
 				A103 /* NetworkStatusView.swift in Sources */,
+				A104 /* TransferReceipt.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

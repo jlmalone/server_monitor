@@ -6,7 +6,8 @@
       "statusFile": "~/.your-transfer-tool/queue-status.json",
       "healthFile": "~/.local/state/your-transfer-monitor/status.json",
       "maxHealthAgeSeconds": 240,
-      "maxActiveSnapshotAgeSeconds": 30
+      "maxActiveSnapshotAgeSeconds": 30,
+      "receiptFile": "~/.your-transfer-tool/transfer-receipts.json"
     },
     {
       "label": "remote",

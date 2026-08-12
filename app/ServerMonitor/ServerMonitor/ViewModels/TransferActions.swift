@@ -225,6 +225,9 @@ final class ChickletStore: ObservableObject {
 // MARK: - Transfer operations engine (Logs tab)
 
 enum TransferMode: String { case copy = "Copy", move = "Move" }
+/// `succeeded` means only that the configured process exited zero. It is not a
+/// destination-delivery assertion; only a trusted receipt-verification boundary
+/// may make a delivery claim.
 enum TransferState { case running, retrying, succeeded, failed, stopped }
 
 struct TransferOperation: Identifiable {

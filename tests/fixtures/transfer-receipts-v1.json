@@ -1,0 +1,27 @@
+{
+  "schema": "choam.transfer-receipts.v1",
+  "transferReceipts": [
+    {
+      "schema": "choam.transfer-receipt.v1",
+      "transferId": "transfer-001",
+      "attemptId": "attempt-001",
+      "queueEntryId": "queue-001",
+      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
+      "state": "DEFERRED"
+    },
+    {
+      "schema": "choam.transfer-receipt.v1",
+      "transferId": "transfer-002",
+      "attemptId": "attempt-002",
+      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
+      "state": "COMPLETED"
+    },
+    {
+      "schema": "choam.transfer-receipt.v1",
+      "transferId": "transfer-003",
+      "attemptId": "attempt-003",
+      "timestamps": { "commandAcceptedAt": "2026-08-12T00:00:00Z" },
+      "state": "FAILED"
+    }
+  ]
+}

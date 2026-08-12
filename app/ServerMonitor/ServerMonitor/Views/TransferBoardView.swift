@@ -172,7 +172,7 @@ struct ManagerView: View {
         case .retrying:
             return "Attempt \(operation.attempt)/\(operation.maxAttempts) failed; waiting to retry"
         case .succeeded:
-            return "\(operation.mode.rawValue) completed successfully"
+            return "\(operation.mode.rawValue) command exited 0; delivery unverified"
         case .failed:
             return "\(operation.mode.rawValue) failed after \(operation.attempt) attempts"
         case .stopped:
@@ -707,7 +707,7 @@ struct LogTailView: View {
         switch op.state {
         case .running:   return "attempt \(op.attempt)/\(op.maxAttempts) · running"
         case .retrying:  return "attempt \(op.attempt)/\(op.maxAttempts) failed · waiting to retry"
-        case .succeeded: return "completed on attempt \(op.attempt)"
+        case .succeeded: return "exit 0 on attempt \(op.attempt); delivery unverified"
         case .failed:    return "failed after \(op.attempt) attempts"
         case .stopped:   return "stopped after \(op.attempt) attempts"
         }

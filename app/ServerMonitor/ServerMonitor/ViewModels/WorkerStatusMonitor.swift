@@ -127,6 +127,14 @@ struct TransfersSource: Codable {
     var healthFile: String?    // optional scheduler/producer heartbeat file
     var maxHealthAgeSeconds: Double?
     var maxActiveSnapshotAgeSeconds: Double?
+    /// Optional V1 delivery-receipt source. It is separate from the legacy
+    /// queue snapshot so older producers retain their exact schema and UI.
+    var receiptFile: String?
+    var receiptCommand: [String]?
+
+    var hasReceiptSource: Bool {
+        (receiptFile?.isEmpty == false) || (receiptCommand?.isEmpty == false)
+    }
 }
 
 /// Optional reader for the transfer tool's JSON-lines history log, surfaced in
@@ -259,44 +267,65 @@ final class TransfersMonitor: ObservableObject {
             var r = 0, p = 0, f = 0
             var warnings: [String] = []
             for src in cfg.sources {
-                guard let data = Self.readSource(src, timeout: cfg.timeoutSeconds ?? 30),
-                      let report = try? JSONDecoder().decode(TransfersQueueReport.self, from: data) else {
+                if let data = Self.readSource(src, timeout: cfg.timeoutSeconds ?? 30),
+                   let report = try? JSONDecoder().decode(TransfersQueueReport.self, from: data) {
+                    let hasActiveQueue = report.summary.running > 0 || report.summary.pending > 0
+                    if hasActiveQueue {
+                        // A fresh active queue snapshot is direct proof that the producer is
+                        // alive. A separate scheduler heartbeat may intentionally remain
+                        // unchanged for the full duration of one long supervised transfer.
+                        let maxAge = max(10, src.maxActiveSnapshotAgeSeconds ?? 30)
+                        if let reason = SnapshotFreshness.staleReason(
+                            timestamp: report.generatedAt,
+                            filePath: src.statusFile,
+                            maxAge: maxAge,
+                            label: "\u{2018}\(src.label)\u{2019} active queue"
+                        ) {
+                            warnings.append(reason)
+                        }
+                    } else if let healthFile = src.healthFile {
+                        let maxAge = max(10, src.maxHealthAgeSeconds ?? 240)
+                        if let reason = SnapshotFreshness.staleReason(
+                            timestamp: nil,
+                            filePath: healthFile,
+                            maxAge: maxAge,
+                            label: "\u{2018}\(src.label)\u{2019} monitor"
+                        ) {
+                            warnings.append(reason)
+                        }
+                    }
+                    r += report.summary.running
+                    p += report.summary.pending
+                    f += report.summary.failed
+                    for item in report.queue where item.status == "running" || item.status == "pending" || item.status == "failed" {
+                        allRows.append(Self.toRow(item, machine: src.label))
+                    }
+                } else {
                     warnings.append("\u{2018}\(src.label)\u{2019} queue unavailable")
-                    continue
                 }
-                let hasActiveQueue = report.summary.running > 0 || report.summary.pending > 0
-                if hasActiveQueue {
-                    // A fresh active queue snapshot is direct proof that the producer is
-                    // alive. A separate scheduler heartbeat may intentionally remain
-                    // unchanged for the full duration of one long supervised transfer.
-                    let maxAge = max(10, src.maxActiveSnapshotAgeSeconds ?? 30)
-                    if let reason = SnapshotFreshness.staleReason(
-                        timestamp: report.generatedAt,
-                        filePath: src.statusFile,
-                        maxAge: maxAge,
-                        label: "\u{2018}\(src.label)\u{2019} active queue"
-                    ) {
-                        warnings.append(reason)
+
+                if src.hasReceiptSource {
+                    guard let receiptData = Self.readReceiptSource(src, timeout: cfg.timeoutSeconds ?? 30),
+                          let decoded = TransferReceiptDecoder.decode(receiptData) else {
+                        warnings.append("\u{2018}\(src.label)\u{2019} receipt unavailable")
+                        continue
                     }
-                } else if let healthFile = src.healthFile {
-                    let maxAge = max(10, src.maxHealthAgeSeconds ?? 240)
-                    if let reason = SnapshotFreshness.staleReason(
-                        timestamp: nil,
-                        filePath: healthFile,
-                        maxAge: maxAge,
-                        label: "\u{2018}\(src.label)\u{2019} monitor"
-                    ) {
-                        warnings.append(reason)
+                    if decoded.isMalformed {
+                        warnings.append("\u{2018}\(src.label)\u{2019} receipt malformed")
                     }
-                }
-                r += report.summary.running
-                p += report.summary.pending
-                f += report.summary.failed
-                for item in report.queue where item.status == "running" || item.status == "pending" || item.status == "failed" {
-                    allRows.append(Self.toRow(item, machine: src.label))
+                    if decoded.receipts.contains(where: { $0.presentation == .verificationRequired }) {
+                        warnings.append("\u{2018}\(src.label)\u{2019} destination evidence required")
+                    }
+                    for receipt in decoded.receipts {
+                        let presentation = receipt.presentation
+                        if presentation.isRunning { r += 1 }
+                        if presentation.isPending { p += 1 }
+                        if presentation.needsAttention { f += 1 }
+                        allRows.append(Self.receiptRow(receipt, machine: src.label))
+                    }
                 }
             }
-            let rank: [String: Int] = ["running": 0, "pending": 1, "failed": 2]
+            let rank: [String: Int] = ["running": 0, "pending": 1, "verifying": 2, "failed": 3, "cancelled": 4]
             allRows.sort {
                 let a = rank[$0.status] ?? 9, b = rank[$1.status] ?? 9
                 return a != b ? a < b : $0.sortPct > $1.sortPct
@@ -326,6 +355,16 @@ final class TransfersMonitor: ObservableObject {
         return result.succeeded ? result.data : nil
     }
 
+    private nonisolated static func readReceiptSource(_ source: TransfersSource, timeout: TimeInterval) -> Data? {
+        if let configuredPath = source.receiptFile, !configuredPath.isEmpty {
+            let path = (configuredPath as NSString).expandingTildeInPath
+            return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+        }
+        guard let command = source.receiptCommand, !command.isEmpty else { return nil }
+        let result = ProcessRunner.run(command, timeout: timeout, includeStandardError: false)
+        return result.succeeded ? result.data : nil
+    }
+
     private nonisolated static func toRow(_ i: TransfersQueueItem, machine: String) -> TransferRow {
         let title = (i.source as NSString).lastPathComponent
         let pct: Int? = i.bytesTotal > 0
@@ -342,6 +381,16 @@ final class TransfersMonitor: ObservableObject {
             id: "\(machine):\(i.id)", machine: machine, title: title, status: i.status,
             statusText: statusText,
             pctText: pct.map { "\($0)%" }, rateText: rateText, etaText: etaText, sortPct: pct ?? -1
+        )
+    }
+
+    private nonisolated static func receiptRow(_ receipt: TransferReceiptView, machine: String) -> TransferRow {
+        let presentation = receipt.presentation
+        return TransferRow(
+            id: "\(machine):receipt:\(receipt.id)", machine: machine,
+            title: "Transfer \(receipt.transferId)", status: presentation.status,
+            statusText: presentation.statusText, pctText: nil, rateText: nil,
+            etaText: nil, sortPct: -1
         )
     }
 

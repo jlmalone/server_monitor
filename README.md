@@ -15,6 +15,7 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 - **📊 Health Checks** - HTTP health monitoring for each service
 - **🧩 One Signed Supervisor** - Infrastructure helpers and scheduled jobs share one Developer ID-signed background registration
 - **⏱️ Bounded Polling** - Read-only checks execute directly with deadlines; local transfer status uses an atomic file
+- **🧾 Receipt-aware Transfers** - Optional generic receipt data keeps delivery provisional until a trusted destination verifier exists
 - **🔋 Resource Guard** - Sustained UI CPU or memory runaway triggers bounded app recovery instead of draining battery indefinitely
 - **🌐 Network Posture** - Lazy floating status window for desired/observed policy, routes, Tailscale peers, manual health checks, and capped logs
 - **🪟 Floating Manager** - Transfer Manager and Network Status stay above ordinary windows when invoked

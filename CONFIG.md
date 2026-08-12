@@ -91,6 +91,8 @@ Schema (`config/transfers.example.json`):
 | `sources[].healthFile` | optional file whose modification time proves the queue producer or scheduler is alive |
 | `sources[].maxHealthAgeSeconds` | heartbeat age limit (default 240 seconds, minimum 10) |
 | `sources[].maxActiveSnapshotAgeSeconds` | maximum age of `generatedAt` while queue work is running or pending (default 30 seconds, minimum 10) |
+| `sources[].receiptFile` | optional local atomic JSON file containing one `choam.transfer-receipt.v1` receipt or a `choam.transfer-receipts.v1` envelope |
+| `sources[].receiptCommand` | optional bounded argv fallback that prints the same receipt JSON directly; used only when `receiptFile` is absent |
 | `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **History** tab in the **Manager** window (opened from the dropdown). Omit to leave it unconfigured. |
 | `history.clearCommand` | optional argv that prunes the history log (e.g. drop FAILED entries); enables a **Clean** button in the History tab. Omit to leave history read-only |
 | `manager.machines` | machines shown in each pane's switcher. Each entry: `label`, optional `local: true` (browse via the local filesystem), `ssh: "user@host"` (preferred remote target), optional ordered `sshFallbacks: ["user@alternate-host"]`, and `start` (initial directory) |
@@ -112,6 +114,25 @@ itself the authoritative liveness signal because a scheduler heartbeat may remai
 unchanged throughout one long transfer. An idle queue snapshot may be old without
 being wrong; configure `healthFile` to distinguish that normal case from a dead
 queue producer.
+
+### Optional delivery receipts V1
+
+For a producer that publishes the additive CHOAM receipt contract, configure one
+of `receiptFile` or `receiptCommand` on the matching source. The consumer retains
+only opaque transfer, attempt, and optional queue-entry IDs plus the lifecycle
+state. It never renders routes, paths, hosts, accounts, proof material, hashes,
+or failure details.
+
+The app is intentionally **not** a destination-evidence verifier. It maps
+`COMMAND_ACCEPTED`, `QUEUE_ADMITTED`, and `DEFERRED` to pending; `ACTIVE` and
+the verification/commit states to in progress; and `FAILED`/`CANCELLED` to
+attention. Even a receipt whose producer state is `COMPLETED` displays as
+**destination evidence required**, never delivered. An unreadable, unsupported,
+or malformed receipt source is shown as receipt unavailable/malformed; an
+unverified `COMPLETED` receipt is likewise attention-required. Both pull the
+menu-bar transfer status off green. This is fail-closed: it supplies no
+delivery evidence and does not change the legacy queue snapshot behavior when no
+receipt source is configured.
 
 The Manager window's **History** tab reads `history.command`, which must print **one
 JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",
@@ -137,7 +158,8 @@ Each launched transfer streams its combined output to a per-operation log under
 low-level commands and inspect failures. A failed transfer **retries with exponential
 backoff** (2, 4, 8, 16 seconds) up to `manager.maxAttempts` and then stops, so it can
 never become a runaway loop, and you can **Retry Now**, **Stop**, or **Retry** a
-finished one. The app only ever runs the argv you configure (plus a generic `ls`
+finished one. An exit-zero Manager command means only that its configured process
+exited zero; it is not delivery proof. The app only ever runs the argv you configure (plus a generic `ls`
 against an ssh target you supply): no host names or tool specifics live in this repo.
 
 ## Protection config

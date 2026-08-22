@@ -96,6 +96,13 @@ as provisional, exposes deferred/in-progress/failed states, and fails closed on
 unavailable or malformed configured receipt data. Cryptographic destination-proof
 verification remains a future trusted-boundary integration.
 
+## Operator secrets sync — shipped
+
+`sm secrets-sync` copies a configured secrets directory to SSH peers listed in
+untracked `~/.config/server-monitor/secrets-sync.json`. The public tree keeps
+only the example schema. Optional cadence belongs on the signed infrastructure
+agent, not a new LaunchAgent.
+
 ## Signed infrastructure agent — shipped
 
 One `SMAppService` LaunchAgent bundled and signed with Server Monitor owns the

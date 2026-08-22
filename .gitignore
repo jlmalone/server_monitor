@@ -54,6 +54,7 @@ scripts/.env
 config/worker.json
 config/transfers.json
 config/network.json
+config/secrets-sync.json
 
 # Backup/archive folders
 launchd_bak_todo/

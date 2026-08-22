@@ -13,6 +13,7 @@ from **untracked** local files that are **never committed** to this repo:
 | **Transfers** | Active file transfers (per item: %, rate, ETA), preferably from an atomically written local status file. | `~/.config/server-monitor/transfers.json` |
 | **Protection** | Read-only fail-closed integrity: one **OK / AT RISK** badge from bounded audit commands. | `~/.config/server-monitor/protection.json` |
 | **Infrastructure Agent** | One signed registration that supervises persistent helpers, scheduled one-shot jobs, and network-change wakeups. | `~/.config/server-monitor/infrastructure-agent.json` |
+| **Secrets sync** | Copies `~/.config/secrets` to other trusted machines over SSH. | `~/.config/server-monitor/secrets-sync.json` |
 | **Network Status** | Compact desired/observed network posture, topology, peer state, and bounded health probes. | `~/.config/server-monitor/network.json` |
 
 ## Network Status config
@@ -45,6 +46,17 @@ capped local-file tail or run a bounded log command only after Refresh.
 Capability maps are descriptive producer telemetry. The versioned
 `transition.apply: "refuse"` field is the authoritative apply gate, so an unrelated
 false capability does not disable an otherwise supported profile.
+
+## Secrets sync config
+
+Copy `config/secrets-sync.example.json` to
+`~/.config/server-monitor/secrets-sync.json`. Fill in SSH targets for other
+machines on the tailnet. The CLI command is `sm secrets-sync`. It rsyncs the
+source directory with destination mode `700`/`600` and runs the remote rsync at
+nice 19. Host names stay in the untracked overlay. Do not commit this file.
+
+To have the signed infrastructure agent own the cadence, add a scheduled job
+whose command is this CLI. Do not create a separate LaunchAgent for it.
 
 ## Worker config
 

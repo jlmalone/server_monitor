@@ -12,13 +12,23 @@ Keep durable, non-secret operator notes in ignored files such as
 Use the tracked examples as the schema reference.
 
 Secrets should live in the platform credential store or a separately protected
-secret manager, not in the notes overlay.
+directory such as `~/.config/secrets`, not in the notes overlay. Server Monitor
+does not store secret values. It can copy that directory to other trusted
+machines over SSH on the private overlay.
+
+Copy `config/secrets-sync.example.json` to
+`~/.config/server-monitor/secrets-sync.json` and list SSH targets there. Run
+`sm secrets-sync` (or `--dry-run`) from this repository's CLI. The command
+prints host success or failure only. Optional: add a uniquely named scheduled
+job in `~/.config/server-monitor/infrastructure-agent.json` so the signed
+infrastructure agent owns the cadence.
 
 ## Moving to another trusted machine
 
 1. Clone the public repository and check out its canonical branch.
 2. Transfer only the required ignored notes and runtime configuration over an
-   authenticated, encrypted channel.
+   authenticated, encrypted channel. Operator secrets use `sm secrets-sync`,
+   not git.
 3. Preserve restrictive permissions on private files.
 4. Replace machine-specific paths and executable locations for the destination.
 5. Validate JSON against the tracked examples, run the CLI tests, and start with

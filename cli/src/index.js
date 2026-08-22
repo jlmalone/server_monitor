@@ -12,6 +12,7 @@ import { stopCommand } from './commands/stop.js';
 import { restartCommand } from './commands/restart.js';
 import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
+import { secretsSyncCommand } from './commands/secrets-sync.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
@@ -89,5 +90,12 @@ program
   .option('-n, --lines <n>', 'Number of lines to show', '50')
   .option('-e, --error', 'Show error log instead of stdout')
   .action(logsCommand);
+
+program
+  .command('secrets-sync')
+  .description('Copy the operator secrets directory to configured Tailscale SSH peers')
+  .option('--dry-run', 'Show rsync without writing destination files')
+  .option('-j, --json', 'JSON result, host names only')
+  .action(secretsSyncCommand);
 
 program.parse();

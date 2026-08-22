@@ -9,7 +9,8 @@ configuration schema and service lifecycle.
 - Keep machine-specific paths, hosts, credentials, and service configuration untracked. Use the
   example configuration for tracked documentation. Follow
   [docs/TRUSTED_MACHINE_CONTEXT.md](docs/TRUSTED_MACHINE_CONTEXT.md) when another trusted machine
-  needs the private overlay.
+  needs the private overlay. Operator secrets sync with `sm secrets-sync` and
+  `~/.config/server-monitor/secrets-sync.json`, not git.
 - Do not create new per-script LaunchAgents for infrastructure helpers; use the configured shared
   infrastructure agent model.
 - Run focused CLI tests and the applicable Xcode build or tests after code changes. See

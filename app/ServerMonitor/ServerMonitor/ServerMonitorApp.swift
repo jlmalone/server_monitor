@@ -143,7 +143,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     private let backgroundService: BackgroundServiceManager
     private var network: NetworkPostureMonitor?
 
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var cancellables = Set<AnyCancellable>()
     private var settingsWindow: NSWindow?
@@ -176,7 +176,29 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
         popover.animates = false
         popover.delegate = self
 
-        if let button = statusItem.button {
+        observeStatusChanges()
+
+        // SwiftUI constructs its App value before AppKit has completed startup
+        // on some macOS releases. Creating an NSStatusItem synchronously from
+        // that initializer can trap inside NSStatusBar. The first main-run-loop
+        // turn happens after application startup has unwound.
+        DispatchQueue.main.async { [weak self] in
+            self?.installStatusItem()
+        }
+    }
+
+    deinit {
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+    }
+
+    private func installStatusItem() {
+        guard statusItem == nil else { return }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = item
+
+        if let button = item.button {
             button.target = self
             button.action = #selector(togglePopover(_:))
             button.sendAction(on: [.leftMouseUp])
@@ -185,16 +207,11 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             button.toolTip = "Server Monitor"
         }
 
-        observeStatusChanges()
         updateStatusItem()
     }
 
-    deinit {
-        NSStatusBar.system.removeStatusItem(statusItem)
-    }
-
     @objc private func togglePopover(_ sender: Any?) {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem?.button else { return }
         if popover.isShown {
             popover.performClose(sender)
         } else {
@@ -247,7 +264,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     }
 
     private func updateStatusItem() {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem?.button else { return }
         let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         let image = NSImage(systemSymbolName: monitor.overallStatus.icon, accessibilityDescription: "Server Monitor")?
             .withSymbolConfiguration(configuration)

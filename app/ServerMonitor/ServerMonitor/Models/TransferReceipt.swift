@@ -192,7 +192,7 @@ enum TransferReceiptDecoder {
         }
         guard result["commandAcceptedAt"] != nil else { return nil }
         let present = names.compactMap { result[$0] }
-        return present.zipWithNext().allSatisfy { $0 <= $1 } ? result : nil
+        return zip(present, present.dropFirst()).allSatisfy { $0 <= $1 } ? result : nil
     }
 
     private static func validStateLineage(_ state: TransferReceiptState, timeline: [String: Date]) -> Bool {

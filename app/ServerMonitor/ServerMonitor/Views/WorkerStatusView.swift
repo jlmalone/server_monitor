@@ -172,7 +172,7 @@ struct TransfersView: View {
         case .running: return "attempt \(operation.attempt)/\(operation.maxAttempts)"
         case .retrying: return "retrying"
         case .failed: return "failed"
-        case .succeeded: return "complete"
+        case .provisional: return "provisional"
         case .stopped: return "stopped"
         }
     }

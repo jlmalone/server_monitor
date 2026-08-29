@@ -28,7 +28,9 @@ struct ServerMonitorApp: App {
         let transferActions = TransferActionsModel()
         let protection = ProtectionMonitor()
         let versions = VersionMonitor()
-        let backgroundService = BackgroundServiceManager()
+        let autoRegisterBackgroundServices =
+            ProcessInfo.processInfo.environment["SERVER_MONITOR_DISABLE_AUTO_REGISTER"] != "1"
+        let backgroundService = BackgroundServiceManager(autoRegister: autoRegisterBackgroundServices)
 
         _monitor = StateObject(wrappedValue: monitor)
         _darkmesh = StateObject(wrappedValue: darkmesh)

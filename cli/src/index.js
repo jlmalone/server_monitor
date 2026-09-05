@@ -102,7 +102,7 @@ program
 program
   .command('cursor-preflight')
   .description('Check or repair Cursor file-backed login readiness without using the macOS keychain')
-  .option('--repair', 'Restrict local Cursor credential file permissions when needed')
+  .option('--repair', 'Repair credential permissions and install the file-backed cursor-agent launcher')
   .option('-j, --json', 'JSON result without credential values')
   .action(cursorPreflightCommand);
 

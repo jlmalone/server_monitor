@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export AGENT_CLI_CREDENTIAL_STORE=file
+launcher="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cursor-file-agent"
+case "${1:-}" in
+  login|logout|status|whoami|models|about|update|mcp|plugin|worker|install-shell-integration|uninstall-shell-integration)
+    exec "$launcher" "$@"
+    ;;
+esac
+exec "$launcher" --yolo --sandbox disabled --trust --model composer-2.5 "$@"

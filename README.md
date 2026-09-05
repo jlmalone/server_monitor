@@ -96,13 +96,32 @@ sm restart --all
 sm logs my-app
 sm logs my-app --error
 
-# Verify or repair local Cursor login-file permissions. This avoids macOS
-# keychain-lock failures for Cursor agent launches.
+# Repair local Cursor login-file permissions and install a file-store launcher.
+# This checks local structure, not whether Cursor accepts the tokens.
 sm cursor-preflight --repair
 
 # Add a new service
 sm add --name "My App" --path ~/projects/myapp --port 3000 --cmd "npm run dev"
 ```
+
+Cursor repair installs `~/.local/bin/cursor-agent` as a link to the CLI's tracked
+launcher, replacing only a recognized Cursor installation link. The launcher
+forces the file credential store in interactive shells and scripts, checks local
+credentials before normal commands, and selects the newest complete installed
+Cursor version. It reinstalls its link after a successful `cursor-agent update`.
+An external reinstall can replace the link; rerun `sm cursor-preflight --repair`
+after that. The CLI installation must remain available while the link is in use.
+
+The preflight rejects symlinks, unexpected ownership, hard-linked login files,
+and macOS ACLs. Repair normalizes ordinary permissions to directory `0700` and
+file `0600`. It never prints credential contents. `ready` describes local checks
+only: revoked or expired tokens require Cursor's authentication response.
+Use `cursor-agent status --format json` and `cursor-agent models` to check account
+access. Missing or invalid credentials require `cursor-agent login`.
+
+To roll back the launcher, replace the `~/.local/bin/cursor-agent` link with the
+`cursor-agent` executable in the desired installed Cursor version directory.
+This restores the vendor launcher and its credential-store defaults.
 
 ## 📋 Configuration
 
@@ -153,7 +172,7 @@ Services are defined in `services.json` (auto-generated on first run):
 | `sm restart <name\|--all>` | Restart service(s) |
 | `sm logs <name>` | Tail service stdout logs |
 | `sm logs <name> --error` | Tail service stderr logs |
-| `sm cursor-preflight --repair` | Verify Cursor's file-backed login and repair local permissions |
+| `sm cursor-preflight --repair` | Check local login structure, repair permissions, and install the file-store launcher |
 | `sm add [options]` | Add new service |
 | `sm remove <name>` | Remove a service |
 | `sm edit` | Open services.json in editor |

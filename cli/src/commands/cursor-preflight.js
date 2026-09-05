@@ -10,9 +10,9 @@ export function cursorPreflightCommand(options) {
     const repair = result.repaired.length > 0
       ? ` Repaired: ${result.repaired.join('; ')}.`
       : '';
-    console.log(chalk.green(`Cursor preflight ready: file-backed credentials are private and usable.${repair}`));
+    console.log(chalk.green(`Cursor local preflight passed: credential structure and permissions checked. Authentication has not been checked.${repair}`));
   } else {
-    console.log(chalk.red(`Cursor preflight needs login: ${result.issue}`));
+    console.log(chalk.red(`Cursor preflight failed: ${result.issue}`));
   }
 
   if (!result.ready) {

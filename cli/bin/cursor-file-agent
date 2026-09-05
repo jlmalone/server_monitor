@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+import { readdirSync, accessSync, constants } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
+import { spawn } from 'child_process';
+import { cursorPreflight } from '../src/lib/cursor-preflight.js';
+
+process.env.AGENT_CLI_CREDENTIAL_STORE = 'file';
+const args = process.argv.slice(2);
+// Login must remain available when the credential file is absent or invalid.
+if (!['login', 'logout', '--help', '-h', '--version', '-v', 'update'].includes(args[0])) {
+  const result = cursorPreflight({ repair: true, install: false });
+  if (!result.ready) {
+    console.error(result.issue);
+    process.exit(1);
+  }
+}
+const versions = join(homedir(), '.local/share/cursor-agent/versions');
+let executable;
+try {
+  for (const version of readdirSync(versions).sort().reverse()) {
+    const directory = join(versions, version);
+    try {
+      accessSync(join(directory, 'node'), constants.X_OK);
+      accessSync(join(directory, 'index.js'), constants.R_OK);
+      accessSync(join(directory, 'cursor-agent'), constants.X_OK);
+      executable = join(directory, 'cursor-agent');
+      break;
+    } catch { /* Ignore incomplete installations. */ }
+  }
+} catch { /* Report missing installation below. */ }
+if (!executable) {
+  console.error('No complete Cursor Agent installation found. Reinstall Cursor Agent.');
+  process.exit(127);
+}
+const child = spawn(executable, args, { stdio: 'inherit', env: process.env });
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => child.kill(signal));
+}
+child.on('error', () => {
+  console.error('Could not launch Cursor Agent. Check the installation.');
+  process.exitCode = 127;
+});
+child.on('exit', (code, signal) => {
+  if (code === 0 && ['login', 'update'].includes(args[0])) {
+    const result = cursorPreflight({ repair: true });
+    if (!result.ready) {
+      console.error(result.issue);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  process.exitCode = code ?? (signal === 'SIGINT' ? 130 : 1);
+});

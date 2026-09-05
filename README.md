@@ -96,6 +96,10 @@ sm restart --all
 sm logs my-app
 sm logs my-app --error
 
+# Verify or repair local Cursor login-file permissions. This avoids macOS
+# keychain-lock failures for Cursor agent launches.
+sm cursor-preflight --repair
+
 # Add a new service
 sm add --name "My App" --path ~/projects/myapp --port 3000 --cmd "npm run dev"
 ```
@@ -149,6 +153,7 @@ Services are defined in `services.json` (auto-generated on first run):
 | `sm restart <name\|--all>` | Restart service(s) |
 | `sm logs <name>` | Tail service stdout logs |
 | `sm logs <name> --error` | Tail service stderr logs |
+| `sm cursor-preflight --repair` | Verify Cursor's file-backed login and repair local permissions |
 | `sm add [options]` | Add new service |
 | `sm remove <name>` | Remove a service |
 | `sm edit` | Open services.json in editor |

@@ -13,6 +13,7 @@ import { restartCommand } from './commands/restart.js';
 import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
 import { secretsSyncCommand } from './commands/secrets-sync.js';
+import { cursorPreflightCommand } from './commands/cursor-preflight.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
@@ -97,5 +98,12 @@ program
   .option('--dry-run', 'Show rsync without writing destination files')
   .option('-j, --json', 'JSON result, host names only')
   .action(secretsSyncCommand);
+
+program
+  .command('cursor-preflight')
+  .description('Check or repair Cursor file-backed login readiness without using the macOS keychain')
+  .option('--repair', 'Restrict local Cursor credential file permissions when needed')
+  .option('-j, --json', 'JSON result without credential values')
+  .action(cursorPreflightCommand);
 
 program.parse();

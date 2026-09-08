@@ -267,34 +267,61 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
 
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
-        let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        let image = NSImage(systemSymbolName: monitor.overallStatus.icon, accessibilityDescription: "Server Monitor")?
-            .withSymbolConfiguration(configuration)
-        image?.isTemplate = true
+        let presentation = statusPresentation
+        let base = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let color = NSImage.SymbolConfiguration(hierarchicalColor: presentation.color)
+        let image = NSImage(
+            systemSymbolName: monitor.overallStatus.icon,
+            accessibilityDescription: presentation.description
+        )?.withSymbolConfiguration(base.applying(color))
+        image?.isTemplate = false
         button.image = image
-        button.contentTintColor = statusTint
+        button.contentTintColor = nil
+        button.setAccessibilityLabel(presentation.description)
+        button.toolTip = presentation.description
     }
 
-    /// Combined menu-bar tint. ExpressVPN and its public-client gate are useful
-    /// protection signals, but do not authorize private LAN/Tailscale transfers.
-    private var statusTint: NSColor {
-        if darkmesh.status?.verdict == "NO-GO" { return .systemRed }
-        if darkmesh.status?.servicesHealthy == false { return .systemRed }
-        if monitor.overallStatus == .stopped { return .systemRed }
-        if darkmesh.status?.verdict == "DEGRADED" { return .systemYellow }
-        if darkmesh.status?.vpnTransferClientBlocked == true { return .systemYellow }
-        if protection.atRisk || transfers.needsAttention || transferActions.needsAttention {
-            return .systemYellow
+    private struct StatusPresentation {
+        let color: NSColor
+        let description: String
+    }
+
+    /// Combined menu-bar presentation. Network policy remains owned by Darkmesh;
+    /// this read-only description explains the producer evidence behind the color.
+    private var statusPresentation: StatusPresentation {
+        let status = darkmesh.status
+        let connectivity = [
+            status.map { "internet \($0.internetOk ? "up" : "down")" },
+            status.map { "DNS \($0.dnsOk ? "up" : "down")" },
+            status.map { "Tailscale \($0.tailscaleOk ? "up" : "down")" },
+            status.map { "VPN \($0.vpnState.lowercased())" }
+        ].compactMap { $0 }.joined(separator: ", ")
+        let posture = status?.postureProfile.map { "Posture: \($0)." } ?? "Posture unavailable."
+
+        if let unavailable = darkmesh.staleReason ?? darkmesh.schemaError ?? darkmesh.parseError {
+            return StatusPresentation(color: .systemGray, description: "Server Monitor unavailable. \(posture) \(unavailable)")
         }
-        if darkmesh.status?.verdict == "GO" {
+        if darkmesh.fileMissing || status == nil {
+            return StatusPresentation(color: .systemGray, description: "Server Monitor unavailable. \(posture) Darkmesh status is unavailable.")
+        }
+        if status?.verdict == "NO-GO" || status?.servicesHealthy == false || monitor.overallStatus == .stopped {
+            let reason = status?.postureReason ?? "A required service or containment check failed."
+            return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) \(connectivity). \(reason)")
+        }
+        if status?.verdict == "DEGRADED" || status?.vpnTransferClientBlocked == true ||
+            protection.atRisk || transfers.needsAttention || transferActions.needsAttention {
+            let reason = status?.postureReason ?? "Optional VPN or another protection signal needs attention."
+            return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). \(reason)")
+        }
+        if status?.verdict == "GO" {
             switch monitor.overallStatus {
-            case .running: return .systemGreen
-            case .stopped: return .systemRed
-            case .checking: return .systemOrange
-            case .unknown: return .systemGray
+            case .running: return StatusPresentation(color: .systemGreen, description: "Server Monitor healthy. \(posture) \(connectivity).")
+            case .stopped: return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) A required service is stopped.")
+            case .checking: return StatusPresentation(color: .systemOrange, description: "Server Monitor checking. \(posture) \(connectivity).")
+            case .unknown: return StatusPresentation(color: .systemGray, description: "Server Monitor unavailable. \(posture) Service state is unknown.")
             }
         }
-        return .systemYellow
+        return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). Status is \(status?.verdict ?? "unknown").")
     }
 
     private func showSettings() {

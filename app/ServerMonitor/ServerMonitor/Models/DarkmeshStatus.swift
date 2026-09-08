@@ -32,6 +32,8 @@ struct DarkmeshStatus: Codable, Equatable {
     let crdReason: String?
     let dnsOverrideActive: Bool?
     let breakers: [String: Breaker]?
+    let postureProfile: String?
+    let postureReason: String?
 
     enum CodingKeys: String, CodingKey {
         case timestamp
@@ -56,6 +58,8 @@ struct DarkmeshStatus: Codable, Equatable {
         case crdReason             = "crd_reason"
         case dnsOverrideActive     = "dns_override_active"
         case breakers
+        case postureProfile       = "posture_profile"
+        case postureReason        = "posture_reason"
     }
 
     /// Recovery snapshot authored by the reconnect watchdog and merged into the

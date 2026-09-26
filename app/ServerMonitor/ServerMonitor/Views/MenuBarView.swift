@@ -72,8 +72,8 @@ struct MenuBarView: View {
             
             // Footer actions
             HStack {
-                Button(action: { monitor.reloadConfig() }) {
-                    Label("Reload Config", systemImage: "arrow.triangle.2.circlepath")
+                Button(action: { monitor.refreshServiceStatuses() }) {
+                    Label("Refresh Service Status", systemImage: "arrow.triangle.2.circlepath")
                         .font(.caption)
                 }
                 .buttonStyle(.borderless)

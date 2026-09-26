@@ -308,10 +308,20 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             let reason = status?.postureReason ?? "A required service or containment check failed."
             return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) \(connectivity). \(reason)")
         }
-        if status?.verdict == "DEGRADED" || status?.vpnTransferClientBlocked == true ||
-            protection.atRisk || transfers.needsAttention || transferActions.needsAttention {
+        if status?.verdict == "DEGRADED" || status?.vpnTransferClientBlocked == true {
             let reason = status?.postureReason ?? "Optional VPN or another protection signal needs attention."
             return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). \(reason)")
+        }
+        if protection.atRisk {
+            let failing = protection.failing.map(\.label).joined(separator: ", ")
+            let reason = failing.isEmpty ? "Protection audit is pending." : "Protection checks need attention: \(failing)."
+            return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). \(reason)")
+        }
+        if transfers.needsAttention {
+            return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). Transfers: \(transfers.headline).")
+        }
+        if transferActions.needsAttention {
+            return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). A transfer action needs review.")
         }
         if status?.verdict == "GO" {
             switch monitor.overallStatus {

@@ -180,7 +180,6 @@ Services are defined in `services.json` (auto-generated on first run):
 | `sm cursor-preflight --repair` | Check local login structure, repair permissions, and install the file-store launcher |
 | `sm add [options]` | Add new service |
 | `sm remove <name>` | Remove a service |
-| `sm edit` | Open services.json in editor |
 
 ## 🏗️ Architecture
 

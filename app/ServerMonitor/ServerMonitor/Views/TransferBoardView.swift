@@ -422,7 +422,7 @@ struct FileRowView: View {
         .contextMenu {
             if entry.isDir {
                 Button { onOpen() } label: { Label("Open", systemImage: "arrow.right.circle") }
-                Button { onMakeChicklet() } label: { Label("Make chicklet", systemImage: "bookmark") }
+                Button { onMakeChicklet() } label: { Label("Pin shortcut", systemImage: "bookmark") }
             }
         }
         .accessibilityElement(children: .combine)

@@ -95,10 +95,10 @@ struct SettingsView: View {
                     Label("Add Service", systemImage: "plus")
                 }
                 Spacer()
-                Button(action: { monitor.reloadConfig() }) {
-                    Label("Reload Config", systemImage: "arrow.clockwise")
+                Button(action: { monitor.refreshServiceStatuses() }) {
+                    Label("Refresh Service Status", systemImage: "arrow.clockwise")
                 }
-                .help("Reload services.json from disk")
+                .help("Check current service status")
             }
             .padding()
         }

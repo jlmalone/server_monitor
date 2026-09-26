@@ -490,8 +490,7 @@ class ServiceMonitor: ObservableObject {
         }
     }
     
-    func reloadConfig() {
-        // For now, just refresh statuses
+    func refreshServiceStatuses() {
         checkAllServices()
     }
     

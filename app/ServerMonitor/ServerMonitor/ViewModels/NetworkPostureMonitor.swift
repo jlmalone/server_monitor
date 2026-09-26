@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+private struct NetworkApplyOutcome: Decodable {
+    let kind: String
+    let applied: Bool
+    let converged: Bool?
+    let reason: String?
+}
+
 @MainActor
 final class NetworkPostureMonitor: ObservableObject {
     @Published private(set) var configured = false
@@ -152,9 +159,22 @@ final class NetworkPostureMonitor: ObservableObject {
         runningActionID = id
         Task.detached { [weak self] in
             let run = ProcessRunner.run(argv, timeout: max(1, timeout))
+            let applyOutcome = try? JSONDecoder().decode(NetworkApplyOutcome.self, from: run.data)
             await MainActor.run { [weak self] in
                 let detail = NetworkArgv.capped(run.output, maximum: 2_048)
-                let line = run.succeeded ? "\(id): completed\n\(detail)" : "\(id): \(run.failureSummary() ?? "failed")\n\(detail)"
+                let summary: String
+                if applyOutcome?.kind == "darkmesh-posture-apply" {
+                    if applyOutcome?.applied == true {
+                        summary = applyOutcome?.converged == false
+                            ? "policy applied, requirements unmet (\(applyOutcome?.reason ?? "unknown"))"
+                            : "policy applied"
+                    } else {
+                        summary = "policy not applied (\(applyOutcome?.reason ?? "unknown"))"
+                    }
+                } else {
+                    summary = run.succeeded ? "completed" : (run.failureSummary() ?? "failed")
+                }
+                let line = "\(id): \(summary)\n\(detail)"
                 self?.actionResult = line
                 self?.diagnosticLog = (self?.diagnosticLog ?? []).suffix(19) + ["\(ISO8601DateFormatter().string(from: Date())) \(line)"]
                 self?.runningActionID = nil

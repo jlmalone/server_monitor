@@ -28,6 +28,16 @@ struct NetworkStatusWindow: View {
                     .task(id: monitor.snapshot?.desired) {
                         if let value = monitor.snapshot?.desired { selectedProfileID = value }
                     }
+                    if !selectedProfileID.isEmpty && selectedProfileID != (monitor.snapshot?.enforced ?? monitor.snapshot?.desired) {
+                        Text("Selection pending. Press Apply and confirm to change the active network policy.")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
+                    if let result = monitor.actionResult, result.hasPrefix("\(selectedProfileID):") {
+                        Text(String(result.split(separator: "\n", maxSplits: 1).first ?? ""))
+                            .font(.caption)
+                            .foregroundStyle(result.contains("requirements unmet") ? Color.yellow : Color.secondary)
+                    }
                     if let choice = monitor.choices.first(where: { $0.id == selectedProfileID }) {
                         Text(profilePolicy(choice))
                             .font(.caption.monospaced())
@@ -53,6 +63,7 @@ struct NetworkStatusWindow: View {
         GroupBox("Posture") {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 7) {
                 row("Desired", monitor.snapshot?.desired ?? "unavailable")
+                row("Applied", monitor.snapshot?.enforced ?? "unavailable")
                 row("Observed", monitor.snapshot?.observed?.compact ?? "unavailable")
                 row("Assessment", monitor.snapshot?.assessment.map { "\($0.severity) · \($0.reason)" } ?? "unknown")
                 if let assessment = monitor.snapshot?.assessment {

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 const cursorDirectory = join(homedir(), '.cursor');
 const authFile = join(cursorDirectory, 'auth.json');
 const launcher = fileURLToPath(new URL('../../bin/cursor-file-agent', import.meta.url));
+const dangerousLauncher = fileURLToPath(new URL('../../bin/cursor-file-dangerously', import.meta.url));
 
 function inspectPrivate(path, directory, repair, repaired) {
   const before = lstatSync(path);
@@ -56,7 +57,7 @@ function installLauncher(repaired) {
     const current = lstatSync(link);
     if (!current.isSymbolicLink()) throw new Error('unsafe-launcher');
     const target = readlinkSync(link);
-    if (target === launcher) return;
+    if (target === launcher || target === dangerousLauncher) return;
     if (!target.startsWith(join(homedir(), '.local/share/cursor-agent/versions/'))) {
       throw new Error('unsafe-launcher');
     }
@@ -64,7 +65,7 @@ function installLauncher(repaired) {
     if (error.code !== 'ENOENT') throw error;
   }
   const temporary = `${link}.repair-${process.pid}`;
-  symlinkSync(launcher, temporary);
+  symlinkSync(dangerousLauncher, temporary);
   try {
     renameSync(temporary, link);
   } catch (error) {

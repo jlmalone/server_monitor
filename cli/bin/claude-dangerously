@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="${DIR}/${SOURCE}"
+done
+ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
+# shellcheck source=agent-dangerously-common.sh
+source "${ROOT}/agent-dangerously-common.sh"
+
+CLAUDE_FALLBACK="$(ls -1 "${HOME}/.local/share/claude/versions" 2>/dev/null | sort | tail -1)"
+if [[ -n "$CLAUDE_FALLBACK" ]]; then
+  CLAUDE_FALLBACK="${HOME}/.local/share/claude/versions/${CLAUDE_FALLBACK}"
+fi
+REAL="$(agent_dangerously_resolve_real CLAUDE_REAL "$CLAUDE_FALLBACK")"
+DEFAULT=(--dangerously-skip-permissions --model opus --effort max)
+
+case "${1:-}" in
+  login|logout|mcp|update|completion|--help|-h|--version|-v)
+    exec "$REAL" "$@"
+    ;;
+esac
+
+exec "$REAL" "${DEFAULT[@]}" "$@"

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="${DIR}/${SOURCE}"
+done
+ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
+# shellcheck source=agent-dangerously-common.sh
+source "${ROOT}/agent-dangerously-common.sh"
+
+REAL="$(agent_dangerously_resolve_real CODEX_REAL "${HOME}/.codex/packages/standalone/current/bin/codex")"
+DEFAULT=(--dangerously-bypass-approvals-and-sandbox -s danger-full-access)
+
+case "${1:-}" in
+  /usage|/uses)
+    echo -n 'WARNING: This will immediately consume a token reset. Proceed? (y/N): '
+    read -r reply
+    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+      echo 'Operation aborted.'
+      exit 1
+    fi
+    ;;
+esac
+
+case "${1:-}" in
+  login|logout|mcp|update|completion|app|plugin|app-server|remote-control)
+    exec "$REAL" "$@"
+    ;;
+esac
+
+exec "$REAL" "${DEFAULT[@]}" "$@"

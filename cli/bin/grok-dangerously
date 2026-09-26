@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="${DIR}/${SOURCE}"
+done
+ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
+# shellcheck source=agent-dangerously-common.sh
+source "${ROOT}/agent-dangerously-common.sh"
+
+GROK_FALLBACK="$(readlink "${HOME}/.grok/bin/grok.real" 2>/dev/null || true)"
+if [[ -z "$GROK_FALLBACK" ]]; then
+  GROK_FALLBACK="$(ls -1 "${HOME}/.grok/downloads"/grok-*-macos-aarch64 2>/dev/null | sort | tail -1)"
+fi
+REAL="$(agent_dangerously_resolve_real GROK_REAL "$GROK_FALLBACK")"
+DEFAULT=(
+  --always-approve
+  --permission-mode bypassPermissions
+  --sandbox off
+  --model grok-4.6
+  --reasoning-effort low
+)
+
+case "${1:-}" in
+  login|logout|mcp|update|completion|--help|-h|--version|-v)
+    exec "$REAL" "$@"
+    ;;
+esac
+
+exec "$REAL" "${DEFAULT[@]}" "$@"

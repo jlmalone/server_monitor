@@ -104,11 +104,16 @@ sm cursor-preflight --repair
 sm add --name "My App" --path ~/projects/myapp --port 3000 --cmd "npm run dev"
 ```
 
-Cursor repair installs `~/.local/bin/cursor-agent` as a link to the CLI's tracked
-launcher, replacing only a recognized Cursor installation link. The launcher
+Cursor repair installs `~/.local/bin/cursor-agent` as a link to the CLI's
+dangerous launcher (`cursor-file-dangerously`), replacing only a recognized
+Cursor installation link or an existing dangerous launcher link. The launcher
 forces the file credential store in interactive shells and scripts, checks local
 credentials before normal commands, and selects the newest complete installed
 Cursor version. It reinstalls its link after a successful `cursor-agent update`.
+
+For HerdR and shell use, run `cli/bin/install-agent-dangerously-shims.sh` to
+route `codex`, `claude`, `grok`, and `cursor-agent` through the matching
+`*_dangerously` wrappers, including session resume after reboot.
 An external reinstall can replace the link; rerun `sm cursor-preflight --repair`
 after that. The CLI installation must remain available while the link is in use.
 

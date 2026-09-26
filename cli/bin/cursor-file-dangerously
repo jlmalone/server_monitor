@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export AGENT_CLI_CREDENTIAL_STORE=file
-launcher="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cursor-file-agent"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="${DIR}/${SOURCE}"
+done
+ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
+launcher="${ROOT}/cursor-file-agent"
 case "${1:-}" in
   login|logout|status|whoami|models|about|update|mcp|plugin|worker|install-shell-integration|uninstall-shell-integration)
     exec "$launcher" "$@"

@@ -8,9 +8,10 @@ single infrastructure LaunchAgent payload registered through `SMAppService`.
 
 - A valid `Developer ID Application` certificate in the login keychain.
 - The matching 10-character Apple Developer Team ID.
-- For notarization, either a `notarytool` keychain profile or Apple ID app-specific
-  password credentials. Copy `scripts/.env.example` to an ignored `.env` file if
-  environment variables are inconvenient.
+- For notarization, either a `notarytool` keychain profile, App Store Connect
+  API key (`NOTARY_KEY`, `NOTARY_KEY_ID`, `NOTARY_ISSUER`), or Apple ID
+  app-specific password. Copy `scripts/.env.example` to an ignored `.env` file
+  if environment variables are inconvenient.
 
 ## Canonical release
 

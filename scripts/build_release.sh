@@ -133,9 +133,12 @@ codesign --verify --verbose=2 "$DMG"
 if [[ "$NOTARIZE" == 1 ]]; then
   if [[ -n "${NOTARY_PROFILE:-}" ]]; then
     xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+  elif [[ -n "${NOTARY_KEY:-}" && -n "${NOTARY_KEY_ID:-}" && -n "${NOTARY_ISSUER:-}" ]]; then
+    xcrun notarytool submit "$DMG" \
+      --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
   else
-    : "${APPLE_ID:?Set APPLE_ID or NOTARY_PROFILE for notarization}"
-    : "${APPLE_APP_PASSWORD:?Set APPLE_APP_PASSWORD or NOTARY_PROFILE for notarization}"
+    : "${APPLE_ID:?Set NOTARY_PROFILE, NOTARY_KEY credentials, or APPLE_ID for notarization}"
+    : "${APPLE_APP_PASSWORD:?Set APPLE_APP_PASSWORD for Apple ID notarization}"
     xcrun notarytool submit "$DMG" \
       --apple-id "$APPLE_ID" \
       --password "$APPLE_APP_PASSWORD" \

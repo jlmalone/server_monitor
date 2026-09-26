@@ -308,7 +308,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             let reason = status?.postureReason ?? "A required service or containment check failed."
             return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) \(connectivity). \(reason)")
         }
-        if status?.verdict == "DEGRADED" || status?.vpnTransferClientBlocked == true {
+        if status?.verdict == "DEGRADED" {
             let reason = status?.postureReason ?? "Optional VPN or another protection signal needs attention."
             return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). \(reason)")
         }
@@ -325,7 +325,9 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
         }
         if status?.verdict == "GO" {
             switch monitor.overallStatus {
-            case .running: return StatusPresentation(color: .systemGreen, description: "Server Monitor healthy. \(posture) \(connectivity).")
+            case .running:
+                let transfer = status?.vpnTransferClientBlocked == true ? " Transfer client is safely blocked by PF." : ""
+                return StatusPresentation(color: .systemGreen, description: "Server Monitor healthy. \(posture) \(connectivity).\(transfer)")
             case .stopped: return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) A required service is stopped.")
             case .checking: return StatusPresentation(color: .systemOrange, description: "Server Monitor checking. \(posture) \(connectivity).")
             case .unknown: return StatusPresentation(color: .systemGray, description: "Server Monitor unavailable. \(posture) Service state is unknown.")

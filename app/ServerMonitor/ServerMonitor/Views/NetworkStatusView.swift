@@ -7,7 +7,7 @@ struct NetworkStatusWindow: View {
     @State private var selectedProfileID = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack { Label("Network Status", systemImage: "point.3.connected.trianglepath.dotted").font(.headline); badge(monitor.posture); Spacer(); if let date = monitor.lastUpdated { Text("Updated \(date, style: .relative) ago").font(.caption).foregroundStyle(.secondary) }; Button { monitor.refresh() } label: { Image(systemName: "arrow.clockwise") } }.padding(12)
+            HStack { Label("Network Status", systemImage: "point.3.connected.trianglepath.dotted").font(.headline); badge(monitor.posture, blocked: monitor.staleReason == nil && monitor.snapshot?.assessment?.state == "blocked"); Spacer(); if let date = monitor.lastUpdated { Text("Updated \(date, style: .relative) ago").font(.caption).foregroundStyle(.secondary) }; Button { monitor.refresh() } label: { Image(systemName: "arrow.clockwise") } }.padding(12)
             Divider()
             if !monitor.configured { placeholder("Network Status is not configured", "Add ~/.config/server-monitor/network.json from config/network.example.json.") }
             else if let error = monitor.configurationError { placeholder("Configuration unavailable", error) }
@@ -66,6 +66,12 @@ struct NetworkStatusWindow: View {
                 row("Applied", monitor.snapshot?.enforced ?? "unavailable")
                 row("Observed", monitor.snapshot?.observed?.compact ?? "unavailable")
                 row("Assessment", monitor.snapshot?.assessment.map { "\($0.severity) · \($0.reason)" } ?? "unknown")
+                if monitor.snapshot?.enforced == "vpn-only-block-on-loss" {
+                    row("All-traffic guard", monitor.snapshot?.observed?.generalEgressGuard == true ? "active" : "unverified or inactive")
+                    Text("This local session stays selected until you apply another posture. Open the sensitive site only when the guard and VPN both show active.")
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                }
                 if let assessment = monitor.snapshot?.assessment {
                     assessmentRow("Required", values: assessment.required, expected: true)
                     assessmentRow("Preferred", values: assessment.preferred, expected: true)
@@ -118,7 +124,7 @@ struct NetworkStatusWindow: View {
         (values ?? [:]).filter(\.value).keys.sorted()
     }
     private func tag(_ text: String) -> some View { Text(text).font(.caption2).padding(.horizontal, 5).padding(.vertical, 2).background(.quaternary, in: Capsule()) }
-    private func badge(_ status: NetworkPostureClass) -> some View { Text(label(status)).font(.caption.bold()).padding(.horizontal, 6).padding(.vertical, 3).foregroundStyle(color(status)).background(color(status).opacity(0.14), in: Capsule()) }
+    private func badge(_ status: NetworkPostureClass, blocked: Bool = false) -> some View { Text(blocked ? "BLOCKED SAFELY" : label(status)).font(.caption.bold()).padding(.horizontal, 6).padding(.vertical, 3).foregroundStyle(blocked ? Color.yellow : color(status)).background((blocked ? Color.yellow : color(status)).opacity(0.14), in: Capsule()) }
     private func label(_ status: NetworkPostureClass) -> String { switch status { case .healthy: return "OK"; case .degraded: return "DEGRADED"; case .failed: return "REQUIRED FAILED"; case .unavailable: return "UNAVAILABLE"; case .stale: return "STALE" } }
     private func color(_ status: NetworkPostureClass) -> Color { switch status { case .healthy: return .green; case .degraded: return .yellow; case .failed: return .red; case .unavailable, .stale: return .secondary } }
     private func placeholder(_ title: String, _ detail: String) -> some View { VStack(spacing: 10) { Image(systemName: "network.slash").font(.system(size: 34)).foregroundStyle(.secondary); Text(title).font(.headline); Text(detail).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 430) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(40) }

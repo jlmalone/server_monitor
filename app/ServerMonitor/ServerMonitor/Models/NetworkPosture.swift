@@ -76,8 +76,9 @@ struct NetworkAssessment: Decodable, Equatable {
 }
 struct NetworkObserved: Decodable, Equatable {
     var available: Bool?; var fresh: Bool?; var reason: String?; var internet: Bool?; var vpn: Bool?; var vpnState: String?; var tailscale: Bool?; var transferSafety: Bool?; var verdict: String?; var ageSeconds: Double?
-    enum CodingKeys: String, CodingKey { case available, fresh, reason, internet, vpn, vpnState, tailscale, transferSafety, verdict, ageSeconds }
-    var compact: String { let value=[internet.map { "internet=\($0)" }, vpnState.map { "vpn=\($0)" }, tailscale.map { "tailscale=\($0)" }, transferSafety.map { "transfer=\($0)" }, fresh.map { "fresh=\($0)" }].compactMap { $0 }.joined(separator: " · "); return value.isEmpty ? (reason ?? "unavailable") : value }
+    enum CodingKeys: String, CodingKey { case available, fresh, reason, internet, vpn, vpnState, tailscale, transferSafety, generalEgressGuard, verdict, ageSeconds }
+    var generalEgressGuard: Bool?
+    var compact: String { let value=[internet.map { "internet=\($0)" }, vpnState.map { "vpn=\($0)" }, tailscale.map { "tailscale=\($0)" }, transferSafety.map { "transfer=\($0)" }, generalEgressGuard.map { "all-traffic guard=\($0)" }, fresh.map { "fresh=\($0)" }].compactMap { $0 }.joined(separator: " · "); return value.isEmpty ? (reason ?? "unavailable") : value }
 }
 struct NetworkPostureSnapshot: Decodable, Equatable {
     var schema: Int?; var kind: String?; var generatedAt: String?; var desired: String?; var enforced: String?; var observed: NetworkObserved?; var convergence: String?; var degradation: [String]; var interfaces: [NetworkInterface]; var routes: [NetworkRoute]; var peers: [NetworkPeer]; var assessment: NetworkAssessment?; var localTailscale: TailscaleLocal?

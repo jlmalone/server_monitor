@@ -151,6 +151,7 @@ final class ProtectionMonitor: ObservableObject {
 
     private let config: ProtectionConfig?
     private var timer: Timer?
+    private var normalInterval: TimeInterval = 300
 
     init(pollInterval: TimeInterval = 10) {
         let path = (NSHomeDirectory() as NSString)
@@ -183,11 +184,8 @@ final class ProtectionMonitor: ObservableObject {
             return
         }
         guard let cfg = config else { return }
-        let interval = max(10, cfg.pollSeconds ?? pollInterval)
+        normalInterval = max(10, cfg.pollSeconds ?? pollInterval)
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.refresh() }
-        }
     }
 
     deinit { timer?.invalidate() }
@@ -209,6 +207,7 @@ final class ProtectionMonitor: ObservableObject {
 
     func refresh() {
         guard let cfg = config, !isRefreshing else { return }
+        timer?.invalidate()
         isRefreshing = true
         Task.detached {
             var out: [ProtectionResult] = []
@@ -220,11 +219,21 @@ final class ProtectionMonitor: ObservableObject {
             }
             let final = out
             await MainActor.run { [weak self] in
-                self?.results = final
-                self?.isRefreshing = false
-                self?.hasCompletedRefresh = true
-                self?.lastCheckedAt = Date()
+                guard let self else { return }
+                self.results = final
+                self.isRefreshing = false
+                self.hasCompletedRefresh = true
+                self.lastCheckedAt = Date()
+                self.scheduleNext()
             }
+        }
+    }
+
+    private func scheduleNext() {
+        timer?.invalidate()
+        let delay = results.contains { !$0.ok } ? min(normalInterval, 30) : normalInterval
+        timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 }

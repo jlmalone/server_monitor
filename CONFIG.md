@@ -105,6 +105,7 @@ Schema (`config/transfers.example.json`):
 | `sources[].maxActiveSnapshotAgeSeconds` | maximum age of `generatedAt` while queue work is running or pending (default 30 seconds, minimum 10) |
 | `sources[].receiptFile` | optional local atomic JSON file, capped at 256 KiB before parsing, containing one `choam.transfer-receipt.v1` receipt or a `choam.transfer-receipts.v1` envelope |
 | `sources[].receiptCommand` | optional bounded argv fallback that prints the same receipt JSON directly; used only when `receiptFile` is absent |
+| `sources[].retryFailedCommand` | optional direct argv with `{id}` for retrying exactly one FAILED queue entry; absent keeps that source read-only. The producer must reject other states and preserve the original request. |
 | `history.command` | optional argv that prints the **past-transfers** log as JSON-lines (one record per line); enables the **History** tab in the **Manager** window (opened from the dropdown). Omit to leave it unconfigured. |
 | `history.clearCommand` | optional argv that prunes the history log (e.g. drop FAILED entries); enables a **Clean** button in the History tab. Omit to leave history read-only |
 | `manager.machines` | machines shown in each pane's switcher. Each entry: `label`, optional `local: true` (browse via the local filesystem), `ssh: "user@host"` (preferred remote target), optional ordered `sshFallbacks: ["user@alternate-host"]`, and `start` (initial directory) |
@@ -169,6 +170,12 @@ History records summarize past sessions and do not contain the complete source,
 destination, mode, and queue ID needed for an exact retry. Do not turn a History
 row into a new MOVE from its display text. Queue retries must target the original
 failed queue entry after its error is reviewed.
+The History detail links to **Transfers → Queue**. A configured failed queue row
+shows its producer error and a confirmation before running `retryFailedCommand`.
+The app substitutes a restricted queue ID into one argv array, never a shell
+string, and refreshes the queue after success. Configure this only after the
+producer's exact failed-entry command is installed. A retry does not resolve a
+destination conflict or make a MOVE safe to overwrite.
 
 With a `manager` block configured, the window's **Files** tab is a dual-pane browser.
 Each pane lists a chosen machine's directory (locally, or via `ssh ls` for a remote).
@@ -210,7 +217,7 @@ Schema (`config/protection.example.json`):
 
 | Key | Meaning |
 |-----|---------|
-| `pollSeconds` | optional poll interval (minimum 10; use a slow cadence such as 300 for deep audits) |
+| `pollSeconds` | optional healthy poll interval (minimum 10; use a slow cadence such as 300 for deep audits). A failing read-only audit retries within 30 seconds until it passes. |
 | `timeoutSeconds` | deadline applied to each check (default 30) |
 | `checks[].id` | stable identifier for the invariant |
 | `checks[].label` | name shown in the panel |

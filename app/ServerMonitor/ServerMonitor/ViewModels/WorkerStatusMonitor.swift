@@ -124,6 +124,7 @@ struct TransfersSource: Codable {
     var label: String          // machine label shown on each row, e.g. "this Mac"
     var statusFile: String?    // preferred local source: atomically-written queue JSON
     var command: [String]?     // bounded argv fallback, primarily for remote sources
+    var retryFailedCommand: [String]? // explicit argv with {id}; absent keeps queue read-only
     var healthFile: String?    // optional scheduler/producer heartbeat file
     var maxHealthAgeSeconds: Double?
     var maxActiveSnapshotAgeSeconds: Double?
@@ -199,6 +200,8 @@ struct TransfersQueueItem: Codable {
     let filesTotal: Int
     let rateBytesPerSec: Int64
     let currentFile: String
+    let error: String?
+    let retryCount: Int?
 }
 
 struct TransfersQueueSummary: Codable { let running: Int; let pending: Int; let failed: Int }
@@ -222,6 +225,13 @@ struct TransferRow: Identifiable {
     let rateText: String?
     let etaText: String?
     let sortPct: Int
+    let queueID: String?
+    let retryCommand: [String]?
+    let failureDetail: String?
+    let retryCount: Int?
+    let sourcePath: String?
+    let destination: String?
+    let mode: String?
 }
 
 @MainActor
@@ -234,6 +244,9 @@ final class TransfersMonitor: ObservableObject {
     @Published private(set) var queueFailed = 0
     @Published private(set) var receiptAttention = 0
     @Published private(set) var lastError: String?
+    @Published private(set) var retryError: String?
+    @Published private(set) var retryMessage: String?
+    @Published private(set) var retryingID: String?
     @Published private(set) var isRefreshing = false
     let configured: Bool
 
@@ -336,7 +349,7 @@ final class TransfersMonitor: ObservableObject {
                     queueRunning += report.summary.running
                     queueFailed += report.summary.failed
                     for item in report.queue where item.status == "running" || item.status == "pending" || item.status == "failed" {
-                        allRows.append(Self.toRow(item, machine: src.label))
+                        allRows.append(Self.toRow(item, source: src))
                     }
                 } else {
                     warnings.append("\u{2018}\(src.label)\u{2019} queue unavailable")
@@ -390,6 +403,27 @@ final class TransfersMonitor: ObservableObject {
         }
     }
 
+    func retryFailed(_ row: TransferRow) {
+        guard row.status == "failed", let command = row.retryCommand,
+              retryingID == nil else { return }
+        retryingID = row.id
+        retryError = nil
+        retryMessage = nil
+        Task.detached {
+            let result = ProcessRunner.run(command, timeout: 30, maxOutputBytes: 4096)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.retryingID = nil
+                if result.succeeded {
+                    self.retryMessage = "Requeue accepted for \(row.title); waiting for the queue snapshot."
+                    self.refresh()
+                } else {
+                    self.retryError = result.failureSummary() ?? "Requeue failed"
+                }
+            }
+        }
+    }
+
     private nonisolated static func readSource(_ source: TransfersSource, timeout: TimeInterval) -> Data? {
         if let configuredPath = source.statusFile, !configuredPath.isEmpty {
             let path = (configuredPath as NSString).expandingTildeInPath
@@ -410,7 +444,8 @@ final class TransfersMonitor: ObservableObject {
         return result.succeeded ? result.data : nil
     }
 
-    private nonisolated static func toRow(_ i: TransfersQueueItem, machine: String) -> TransferRow {
+    private nonisolated static func toRow(_ i: TransfersQueueItem, source: TransfersSource) -> TransferRow {
+        let machine = source.label
         let title = (i.source as NSString).lastPathComponent
         let pct: Int? = i.bytesTotal > 0
             ? Int((Double(i.bytesTransferred) / Double(i.bytesTotal) * 100).rounded()) : nil
@@ -422,10 +457,22 @@ final class TransfersMonitor: ObservableObject {
         // or has just re-attempted after a hiccup: alive, not stuck. Say "starting…"
         // rather than a bare "running" that reads as frozen when no rate is showing.
         let statusText = (i.status == "running" && i.bytesTotal == 0) ? "starting…" : i.status
+        let safeID = i.id.range(of: "^[A-Za-z0-9_-]{1,128}$", options: .regularExpression) != nil
+        let retryCommand: [String]?
+        if i.status == "failed", safeID,
+           let template = source.retryFailedCommand, !template.isEmpty,
+           template.contains(where: { $0.contains("{id}") }) {
+            retryCommand = template.map { $0.replacingOccurrences(of: "{id}", with: i.id) }
+        } else {
+            retryCommand = nil
+        }
         return TransferRow(
             id: "\(machine):\(i.id)", machine: machine, title: title, status: i.status,
             statusText: statusText,
-            pctText: pct.map { "\($0)%" }, rateText: rateText, etaText: etaText, sortPct: pct ?? -1
+            pctText: pct.map { "\($0)%" }, rateText: rateText, etaText: etaText, sortPct: pct ?? -1,
+            queueID: i.id, retryCommand: retryCommand,
+            failureDetail: i.error, retryCount: i.retryCount,
+            sourcePath: i.source, destination: i.dest, mode: i.mode
         )
     }
 
@@ -435,7 +482,9 @@ final class TransfersMonitor: ObservableObject {
             id: "\(machine):receipt:\(receipt.id)", machine: machine,
             title: "Transfer \(receipt.transferId)", status: presentation.status,
             statusText: presentation.statusText, pctText: nil, rateText: nil,
-            etaText: nil, sortPct: -1
+            etaText: nil, sortPct: -1,
+            queueID: nil, retryCommand: nil, failureDetail: nil, retryCount: nil,
+            sourcePath: nil, destination: nil, mode: nil
         )
     }
 

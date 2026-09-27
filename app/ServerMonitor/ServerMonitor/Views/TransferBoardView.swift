@@ -547,6 +547,7 @@ struct TransferActivityView: View {
     @ObservedObject var actions: TransferActionsModel
     @ObservedObject var transfers: TransfersMonitor
     @Binding var section: TransferActivitySection
+    @Binding var queueFailedOnly: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -560,7 +561,7 @@ struct TransferActivityView: View {
             .padding(10)
             Divider()
             if section == .queue {
-                TransferQueueActivityView(monitor: transfers)
+                TransferQueueActivityView(monitor: transfers, failedOnly: $queueFailedOnly)
             } else {
                 TransferLogsView(actions: actions)
             }
@@ -571,6 +572,9 @@ struct TransferActivityView: View {
 
 private struct TransferQueueActivityView: View {
     @ObservedObject var monitor: TransfersMonitor
+    @Binding var failedOnly: Bool
+    @State private var retryCandidate: TransferRow?
+    @State private var confirmRetry = false
 
     private var summary: String {
         if !monitor.configured { return "No queue source configured" }
@@ -581,16 +585,25 @@ private struct TransferQueueActivityView: View {
         return parts.joined(separator: " · ")
     }
 
+    private var displayedRows: [TransferRow] {
+        failedOnly ? monitor.rows.filter { $0.status == "failed" } : monitor.rows
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(summary).font(.headline)
                 Spacer()
+                if monitor.failed > 0 {
+                    Button(failedOnly ? "Show all" : "Review \(monitor.failed) failed") {
+                        failedOnly.toggle()
+                    }
+                }
                 Button { monitor.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                     .disabled(monitor.isRefreshing)
             }
             .padding(12)
-            Text("Read-only queue status. Pending work is not an active transfer; completed delivery requires destination evidence.")
+            Text("Pending work is not an active transfer. Review a failed entry before requeueing it; completed delivery requires destination evidence.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 12)
@@ -599,11 +612,25 @@ private struct TransferQueueActivityView: View {
                 Text(warning).font(.caption).foregroundColor(.orange)
                     .padding(.horizontal, 12).padding(.bottom, 8)
             }
+            if let retryError = monitor.retryError {
+                Text("Requeue failed: \(retryError)").font(.caption).foregroundColor(.red)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
+            if let retryMessage = monitor.retryMessage {
+                Text(retryMessage).font(.caption).foregroundColor(.green)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
+            if failedOnly && !displayedRows.isEmpty && !displayedRows.contains(where: { $0.retryCommand != nil }) {
+                Text("Requeue is unavailable until this queue source has an exact failed-entry command installed and configured.")
+                    .font(.caption).foregroundColor(.secondary)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
             Divider()
-            if monitor.rows.isEmpty {
+            if displayedRows.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "shippingbox").font(.system(size: 36)).foregroundColor(.secondary)
-                    Text(monitor.lastError == nil ? "No queued transfers" : "Queue status unavailable")
+                    Text(failedOnly ? "No failed queue entries" :
+                         monitor.lastError == nil ? "No queued transfers" : "Queue status unavailable")
                         .font(.headline)
                     Text(monitor.lastError != nil ? "Check the warning above." :
                          monitor.configured ? "No running, pending, or failed queue entries." :
@@ -612,7 +639,7 @@ private struct TransferQueueActivityView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(monitor.rows) { row in
+                List(displayedRows) { row in
                     HStack(spacing: 10) {
                         Image(systemName: row.status == "failed" ? "xmark.octagon.fill" :
                               row.status == "running" ? "arrow.right.circle.fill" : "clock")
@@ -622,13 +649,39 @@ private struct TransferQueueActivityView: View {
                             Text(row.title).lineLimit(1).truncationMode(.middle)
                             Text("\(row.machine) · \(row.statusText)")
                                 .font(.caption).foregroundColor(.secondary)
+                            if let detail = row.failureDetail, row.status == "failed" {
+                                Text(detail).font(.caption2).foregroundColor(.orange)
+                                    .lineLimit(2).help(detail)
+                            }
+                            if let retries = row.retryCount, row.status == "failed" {
+                                Text("Retries: \(retries)")
+                                    .font(.caption2).foregroundColor(.secondary)
+                            }
                         }
                         Spacer()
                         if let pct = row.pctText { Text(pct).monospacedDigit().foregroundColor(.secondary) }
                         if let rate = row.rateText { Text(rate).monospacedDigit().foregroundColor(.secondary) }
+                        if row.retryCommand != nil {
+                            Button("Requeue") {
+                                retryCandidate = row
+                                confirmRetry = true
+                            }
+                            .disabled(monitor.retryingID != nil)
+                            .accessibilityLabel("Requeue failed transfer \(row.title)")
+                        }
                     }
                     .accessibilityElement(children: .combine)
                 }
+            }
+        }
+        .confirmationDialog("Requeue this failed transfer?", isPresented: $confirmRetry, titleVisibility: .visible) {
+            if let row = retryCandidate {
+                Button("Requeue \(row.title)") { monitor.retryFailed(row) }
+            }
+            Button("Cancel", role: .cancel) { retryCandidate = nil }
+        } message: {
+            if let row = retryCandidate {
+                Text("\(row.mode ?? "Transfer") \(row.queueID ?? "") from \(row.sourcePath ?? "?") to \(row.destination ?? "?"). \(row.failureDetail ?? "Review the failure before retrying.") The original overwrite and verification rules remain in force.")
             }
         }
     }

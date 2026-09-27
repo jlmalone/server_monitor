@@ -264,6 +264,7 @@ struct TransferHistoryWindow: View {
     @ObservedObject var transfers: TransfersMonitor
     @State private var selectedTab = TransferWorkspaceTab.files
     @State private var activitySection: TransferActivitySection = .queue
+    @State private var queueFailedOnly = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -305,9 +306,14 @@ struct TransferHistoryWindow: View {
                 selectedTab = .logs
             })
         case .history:
-            TransferHistoryTab()
+            TransferHistoryTab(onOpenQueue: {
+                activitySection = .queue
+                queueFailedOnly = true
+                selectedTab = .logs
+            })
         case .logs:
-            TransferActivityView(actions: actions, transfers: transfers, section: $activitySection)
+            TransferActivityView(actions: actions, transfers: transfers,
+                                 section: $activitySection, queueFailedOnly: $queueFailedOnly)
         case .inventory:
             TransferToolStubTab(
                 title: "Inventory",
@@ -360,6 +366,7 @@ private struct TransferToolStubTab: View {
 /// The functional History tab: a searchable, status-filtered, newest-first table
 /// of past transfers with a click-to-drill detail pane.
 struct TransferHistoryTab: View {
+    let onOpenQueue: () -> Void
     @StateObject private var loader = TransferHistoryLoader()
     @State private var search = ""
     @State private var statusFilter = "FAILED"   // default to failures — the triage view
@@ -387,6 +394,17 @@ struct TransferHistoryTab: View {
             content
             if let rec = selectedRecord {
                 Divider()
+                if rec.status.uppercased() == "FAILED" {
+                    HStack {
+                        Text("History records are past attempts. Open Transfers > Queue to review exact failed entries and requeue when the source supports it.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button("Open Queue", action: onOpenQueue)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                }
                 TransferHistoryDetail(record: rec)
             }
         }

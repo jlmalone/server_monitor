@@ -4,6 +4,7 @@
     {
       "label": "this Mac",
       "statusFile": "~/.your-transfer-tool/queue-status.json",
+      "retryFailedCommand": ["your-transfer-cli", "queue", "--retry-failed", "{id}"],
       "healthFile": "~/.local/state/your-transfer-monitor/status.json",
       "maxHealthAgeSeconds": 240,
       "maxActiveSnapshotAgeSeconds": 30,

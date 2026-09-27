@@ -536,7 +536,105 @@ struct TransferConfirmSheet: View {
     }
 }
 
-// MARK: - Logs tab (live-tail each operation)
+// MARK: - Queue activity and Manager logs
+
+enum TransferActivitySection: String, CaseIterable {
+    case queue = "Queue"
+    case managerLogs = "Manager logs"
+}
+
+struct TransferActivityView: View {
+    @ObservedObject var actions: TransferActionsModel
+    @ObservedObject var transfers: TransfersMonitor
+    @Binding var section: TransferActivitySection
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Transfer source", selection: $section) {
+                ForEach(TransferActivitySection.allCases, id: \.self) { item in
+                    Text(item.rawValue).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 330)
+            .padding(10)
+            Divider()
+            if section == .queue {
+                TransferQueueActivityView(monitor: transfers)
+            } else {
+                TransferLogsView(actions: actions)
+            }
+        }
+        .onAppear { transfers.refresh() }
+    }
+}
+
+private struct TransferQueueActivityView: View {
+    @ObservedObject var monitor: TransfersMonitor
+
+    private var summary: String {
+        if !monitor.configured { return "No queue source configured" }
+        var parts: [String] = []
+        parts.append("\(monitor.running) running")
+        parts.append("\(monitor.pending) pending")
+        parts.append("\(monitor.failed) failed")
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(summary).font(.headline)
+                Spacer()
+                Button { monitor.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                    .disabled(monitor.isRefreshing)
+            }
+            .padding(12)
+            Text("Read-only queue status. Pending work is not an active transfer; completed delivery requires destination evidence.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            if let warning = monitor.lastError {
+                Text(warning).font(.caption).foregroundColor(.orange)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
+            Divider()
+            if monitor.rows.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "shippingbox").font(.system(size: 36)).foregroundColor(.secondary)
+                    Text(monitor.lastError == nil ? "No queued transfers" : "Queue status unavailable")
+                        .font(.headline)
+                    Text(monitor.lastError != nil ? "Check the warning above." :
+                         monitor.configured ? "No running, pending, or failed queue entries." :
+                         "Configure a transfer source to see its queue.")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(monitor.rows) { row in
+                    HStack(spacing: 10) {
+                        Image(systemName: row.status == "failed" ? "xmark.octagon.fill" :
+                              row.status == "running" ? "arrow.right.circle.fill" : "clock")
+                            .foregroundColor(row.status == "failed" ? .red :
+                                             row.status == "running" ? .green : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.title).lineLimit(1).truncationMode(.middle)
+                            Text("\(row.machine) · \(row.statusText)")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        if let pct = row.pctText { Text(pct).monospacedDigit().foregroundColor(.secondary) }
+                        if let rate = row.rateText { Text(rate).monospacedDigit().foregroundColor(.secondary) }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Logs tab (live-tail Manager-launched operations)
 
 struct TransferLogsView: View {
     @ObservedObject var actions: TransferActionsModel
@@ -569,7 +667,7 @@ struct TransferLogsView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(.system(size: 36)).foregroundColor(.secondary).accessibilityHidden(true)
-                        Text(actions.operations.isEmpty ? "No transfers launched yet" : "Select a transfer to view its log")
+                        Text(actions.operations.isEmpty ? "No Manager logs in this session" : "Select a transfer to view its log")
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -582,8 +680,8 @@ struct TransferLogsView: View {
         Group {
             if actions.operations.isEmpty {
                 VStack(spacing: 6) {
-                    Text("No transfers launched yet").font(.headline)
-                    Text("Drag a file from one pane onto a folder in the other to start one.")
+                    Text("No Manager logs in this session").font(.headline)
+                    Text("Use Queue for queued transfers, or drag a file between panes to start a Manager transfer.")
                         .font(.caption).foregroundColor(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 240)
                 }

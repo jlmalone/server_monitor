@@ -238,7 +238,7 @@ private enum TransferWorkspaceTab: Int, CaseIterable, Identifiable {
         switch self {
         case .files: return "Files"
         case .history: return "History"
-        case .logs: return "Logs"
+        case .logs: return "Transfers"
         case .inventory: return "Inventory"
         case .reclaim: return "Reclaim"
         }
@@ -261,7 +261,9 @@ private enum TransferWorkspaceTab: Int, CaseIterable, Identifiable {
 /// window"). Reclaim is read-only/dry-run only by design — this window never deletes.
 struct TransferHistoryWindow: View {
     @ObservedObject var actions: TransferActionsModel
+    @ObservedObject var transfers: TransfersMonitor
     @State private var selectedTab = TransferWorkspaceTab.files
+    @State private var activitySection: TransferActivitySection = .queue
 
     var body: some View {
         VStack(spacing: 0) {
@@ -298,11 +300,14 @@ struct TransferHistoryWindow: View {
     private var selectedContent: some View {
         switch selectedTab {
         case .files:
-            ManagerView(actions: actions, showLogs: { selectedTab = .logs })
+            ManagerView(actions: actions, showLogs: {
+                activitySection = .managerLogs
+                selectedTab = .logs
+            })
         case .history:
             TransferHistoryTab()
         case .logs:
-            TransferLogsView(actions: actions)
+            TransferActivityView(actions: actions, transfers: transfers, section: $activitySection)
         case .inventory:
             TransferToolStubTab(
                 title: "Inventory",

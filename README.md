@@ -19,6 +19,7 @@ A lightweight macOS dev server manager using native `launchd` for reliable, pers
 - **🔋 Resource Guard** - Sustained UI CPU or memory runaway triggers bounded app recovery instead of draining battery indefinitely
 - **🌐 Network Posture** - Lazy floating status window for desired/observed policy, routes, Tailscale peers, manual health checks, and capped logs
 - **🪟 Floating Manager** - Transfer Manager and Network Status stay above ordinary windows when invoked
+- **📦 Queue activity in Manager** - The Transfers tab shows configured queue activity separately from logs for transfers launched in Manager
 - **📝 Centralized Logs** - All service logs in one configurable location
 - **🚀 JSON-first Config** - Single source of truth in `services.json`
 - **🔒 Boot Persistence** - Services start automatically at login

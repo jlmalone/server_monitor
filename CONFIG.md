@@ -171,8 +171,14 @@ directory*; a dialog shows the source, the `from → into` route, and **Copy**, 
 shown identically above both panes: right-click a folder (or use the path-bar bookmark)
 to make one, click it to send a pane straight there, persisted to `chickletsPath`.
 
+The **Transfers** tab has a read-only **Queue** section sourced from the same
+`transfers.json` feeds as the menu panel, with running, pending, and failed counts.
+Its **Manager logs** section contains only transfers launched from this window
+during the current app session. A pending queue entry is not a running transfer;
+neither section claims destination delivery from an exit-zero command alone.
+
 Each launched transfer streams its combined output to a per-operation log under
-`manager.logDir`; the **Logs** tab live-tails the selected one so you can watch the
+`manager.logDir`; **Transfers → Manager logs** live-tails the selected one so you can watch the
 low-level commands and inspect failures. A failed transfer **retries with exponential
 backoff** (2, 4, 8, 16 seconds) up to `manager.maxAttempts` and then stops, so it can
 never become a runaway loop, and you can **Retry Now**, **Stop**, or **Retry** a

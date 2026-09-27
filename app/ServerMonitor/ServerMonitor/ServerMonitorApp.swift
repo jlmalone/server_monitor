@@ -357,7 +357,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     private func showManager() {
         popover.performClose(nil)
         if managerWindow == nil {
-            let controller = NSHostingController(rootView: TransferHistoryWindow(actions: transferActions))
+            let controller = NSHostingController(rootView: TransferHistoryWindow(actions: transferActions, transfers: transfers))
             let window = NSWindow(contentViewController: controller)
             window.title = "Manager"
             window.setContentSize(NSSize(width: 920, height: 600))

@@ -11,9 +11,10 @@ Optional architecture reference. Follow [AGENTS.md](AGENTS.md) first.
 The app ships optional, machine-specific menu-bar panels: a read-only **VPN**
 protection-status row, a **Worker** start/stop control, a read-only **Transfers**
 status panel (active transfers — %, rate, ETA — preferably from an atomic JSON
-snapshot), and bounded read-only **Protection** audits. An unresolved failed
-transfer or unknown/failing protection result downgrades the menu-bar tint off
-green. Their behavior is generic; all machine-specific values load from untracked
+snapshot), and bounded read-only **Protection** audits. Failed transfer entries
+remain orange in Transfers. A fresh running queue can keep the combined menu-bar
+icon green while its failures remain visible; a source error, no running work
+with failures, or unknown/failing protection pulls that icon off green. Their behavior is generic; all machine-specific values load from untracked
 local config — see [CONFIG.md](./CONFIG.md) and [ROADMAP.md](./ROADMAP.md).
 Detailed integration notes are kept in an untracked local doc, not in this repo.
 See [docs/TRUSTED_MACHINE_CONTEXT.md](docs/TRUSTED_MACHINE_CONTEXT.md) for the

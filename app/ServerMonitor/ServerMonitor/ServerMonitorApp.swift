@@ -317,7 +317,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             let reason = failing.isEmpty ? "Protection audit is pending." : "Protection checks need attention: \(failing)."
             return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). \(reason)")
         }
-        if transfers.needsAttention {
+        if transfers.blocksOverallHealthy {
             return StatusPresentation(color: .systemOrange, description: "Server Monitor degraded. \(posture) \(connectivity). Transfers: \(transfers.headline).")
         }
         if transferActions.needsAttention {
@@ -327,7 +327,10 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             switch monitor.overallStatus {
             case .running:
                 let transfer = status?.vpnTransferClientBlocked == true ? " Transfer client is safely blocked by PF." : ""
-                return StatusPresentation(color: .systemGreen, description: "Server Monitor healthy. \(posture) \(connectivity).\(transfer)")
+                let queue = transfers.queueFailed > 0 && transfers.queueRunning > 0
+                    ? " Transfers: \(transfers.headline); failed entries need review."
+                    : ""
+                return StatusPresentation(color: .systemGreen, description: "Server Monitor healthy. \(posture) \(connectivity).\(transfer)\(queue)")
             case .stopped: return StatusPresentation(color: .systemRed, description: "Server Monitor failed. \(posture) A required service is stopped.")
             case .checking: return StatusPresentation(color: .systemOrange, description: "Server Monitor checking. \(posture) \(connectivity).")
             case .unknown: return StatusPresentation(color: .systemGray, description: "Server Monitor unavailable. \(posture) Service state is unknown.")

@@ -127,6 +127,11 @@ unchanged throughout one long transfer. An idle queue snapshot may be old withou
 being wrong; configure `healthFile` to distinguish that normal case from a dead
 queue producer.
 
+Failed queue entries remain orange and countable in Transfers. When a fresh
+source also reports running queue work, those past failures do not turn the
+combined menu icon orange. Source errors, receipt attention, and a failed queue
+with no running work still require attention in the combined icon.
+
 ### Optional delivery receipts V1
 
 For a producer that publishes the additive CHOAM receipt contract, configure one
@@ -160,6 +165,10 @@ window is searchable, status-filterable (defaults to **Failed** for triage) and
 newest-first, with click-to-drill detail. It also carries **Inventory** and
 **Reclaim** tabs that activate once the tool exposes those as JSON (Reclaim is
 read-only / dry-run only — the app never deletes).
+History records summarize past sessions and do not contain the complete source,
+destination, mode, and queue ID needed for an exact retry. Do not turn a History
+row into a new MOVE from its display text. Queue retries must target the original
+failed queue entry after its error is reviewed.
 
 With a `manager` block configured, the window's **Files** tab is a dual-pane browser.
 Each pane lists a chosen machine's directory (locally, or via `ssh ls` for a remote).

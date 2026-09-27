@@ -12,9 +12,10 @@ A compact status row that mirrors a local network-protection status file
 (`/tmp/darkmesh-status.json`) written by a separate per-machine helper: a verdict
 plus VPN / raw-IP / open-internet / DNS / Tailscale / optional remote-access probes,
 VPN-bound public-client gate state, temporary DNS recovery state, per-fault circuit
-breakers, and a last-auto-disconnect footnote. An active VPN-client gate pulls the
-combined tint off green even when broader network health is good. It does not mean
-private LAN or Tailscale transfers are blocked. The app only *reads* the file.
+breakers, and a last-auto-disconnect footnote. A safely enforced transfer gate is
+shown separately and does not by itself pull a healthy VPN status off green. It
+does not mean private LAN or Tailscale transfers are blocked. The app only *reads*
+the file.
 
 The menu extra is owned by an AppKit `NSStatusItem` and `NSPopover`, with the
 panel content still rendered in SwiftUI. This avoids the system

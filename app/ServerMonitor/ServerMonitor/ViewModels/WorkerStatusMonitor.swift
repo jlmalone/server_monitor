@@ -230,6 +230,9 @@ final class TransfersMonitor: ObservableObject {
     @Published private(set) var running = 0
     @Published private(set) var pending = 0
     @Published private(set) var failed = 0
+    @Published private(set) var queueRunning = 0
+    @Published private(set) var queueFailed = 0
+    @Published private(set) var receiptAttention = 0
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
     let configured: Bool
@@ -284,12 +287,20 @@ final class TransfersMonitor: ObservableObject {
 
     var needsAttention: Bool { failed > 0 || lastError != nil }
 
+    /// Historical item failures stay visible in Transfers while fresh running
+    /// work proves the queue is operating. Source/read errors still affect the
+    /// combined status even when a prior snapshot reported running work.
+    var blocksOverallHealthy: Bool {
+        lastError != nil || receiptAttention > 0 || (queueFailed > 0 && queueRunning == 0)
+    }
+
     func refresh() {
         guard let cfg = config, !isRefreshing else { return }
         isRefreshing = true
         Task.detached {
             var allRows: [TransferRow] = []
             var r = 0, p = 0, f = 0
+            var queueRunning = 0, queueFailed = 0, receiptAttention = 0
             var warnings: [String] = []
             for src in cfg.sources {
                 if let data = Self.readSource(src, timeout: cfg.timeoutSeconds ?? 30),
@@ -322,6 +333,8 @@ final class TransfersMonitor: ObservableObject {
                     r += report.summary.running
                     p += report.summary.pending
                     f += report.summary.failed
+                    queueRunning += report.summary.running
+                    queueFailed += report.summary.failed
                     for item in report.queue where item.status == "running" || item.status == "pending" || item.status == "failed" {
                         allRows.append(Self.toRow(item, machine: src.label))
                     }
@@ -345,7 +358,10 @@ final class TransfersMonitor: ObservableObject {
                         let presentation = receipt.presentation
                         if presentation.isRunning { r += 1 }
                         if presentation.isPending { p += 1 }
-                        if presentation.needsAttention { f += 1 }
+                        if presentation.needsAttention {
+                            f += 1
+                            receiptAttention += 1
+                        }
                         allRows.append(Self.receiptRow(receipt, machine: src.label))
                     }
                 }
@@ -356,6 +372,7 @@ final class TransfersMonitor: ObservableObject {
                 return a != b ? a < b : $0.sortPct > $1.sortPct
             }
             let fRows = allRows, fr = r, fp = p, ff = f
+            let fqr = queueRunning, fqf = queueFailed, fra = receiptAttention
             let warning = warnings.isEmpty ? nil : warnings.joined(separator: " · ")
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -363,6 +380,9 @@ final class TransfersMonitor: ObservableObject {
                 self.running = fr
                 self.pending = fp
                 self.failed = ff
+                self.queueRunning = fqr
+                self.queueFailed = fqf
+                self.receiptAttention = fra
                 self.lastError = warning
                 self.isRefreshing = false
                 self.scheduleNext()

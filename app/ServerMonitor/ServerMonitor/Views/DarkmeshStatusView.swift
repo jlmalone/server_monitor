@@ -47,14 +47,11 @@ struct DarkmeshStatusView: View {
                 .font(.headline)
             Spacer()
             if let s = monitor.status {
-                let transferBlocked = s.vpnTransferClientBlocked == true
-                let protected = s.verdict == "GO" && s.servicesHealthy && !transferBlocked
-                let label = transferBlocked
-                    ? "VPN client paused"
-                    : (protected
-                        ? "Protected"
-                        : (s.verdict == "GO" ? "Supervisor degraded" : "\(s.verdictEmoji) \(s.verdict)"))
-                let color = transferBlocked ? Color.orange : (s.servicesHealthy ? s.verdictColor : Color.red)
+                let protected = s.verdict == "GO" && s.servicesHealthy
+                let label = protected
+                    ? "Protected"
+                    : (s.verdict == "GO" ? "Supervisor degraded" : "\(s.verdictEmoji) \(s.verdict)")
+                let color = s.servicesHealthy ? s.verdictColor : Color.red
                 Text(label)
                     .font(.caption.bold())
                     .padding(.horizontal, 6)
@@ -85,7 +82,13 @@ struct DarkmeshStatusView: View {
                 probeRow("Supervisor", value: servicesOK ? "healthy" : "degraded", ok: servicesOK)
             }
             if let transferBlocked = s.vpnTransferClientBlocked {
-                probeRow("VPN client", value: transferBlocked ? "paused" : "allowed", ok: !transferBlocked)
+                probeRow("Transfer gate", value: transferBlocked ? "blocking traffic" : "clear",
+                         ok: transferBlocked ? nil : true)
+                if transferBlocked {
+                    Text("Transfer traffic is blocked until recovery checks pass. The VPN may still be connected.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             if s.crdRequired == true {
                 probeRow("Remote access", value: s.crdOk == true ? "reachable" : (s.crdReason ?? "unreachable"),
@@ -104,7 +107,7 @@ struct DarkmeshStatusView: View {
                 .frame(width: 7, height: 7)
             Text(label)
                 .font(.caption)
-                .frame(width: 78, alignment: .leading)
+                .frame(width: 90, alignment: .leading)
             Text(value)
                 .font(.caption2)
                 .foregroundColor(.secondary)

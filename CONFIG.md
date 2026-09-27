@@ -217,6 +217,11 @@ recent audit time, so a missing executable or timeout is distinguishable from a
 failed invariant. Prefer a command name resolvable through `PATH` over an
 installation-prefix-specific absolute path when a package manager owns the tool.
 
+The VPN Protection panel reports `pf_kill_active` as **Transfer gate: blocking
+traffic**. This is the separate transfer client's PF containment, not ExpressVPN's
+connection state or proof that the client process itself is paused. Darkmesh can
+report VPN Connected and network GO while the gate protects a transfer incident.
+
 **Check depth matters.** `launchctl print …` only proves an agent is *loaded*. For
 a watchdog loop, also assert it is *running* (has a pid) and its status output is
 *fresh* — a loaded-but-dead loop is the silent failure mode. The simplest robust

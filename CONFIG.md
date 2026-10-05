@@ -30,6 +30,11 @@ unsupported envelope is unavailable rather than treated as healthy.
 `probeCommand`, `probes`, and `diagnostics` are bounded direct argv arrays. Probes must be read-only;
 use them for peer posture, health, VPN, SSH, and transfer-readiness checks. A failed
 required probe is red; failed optional probes and producer degradation are yellow.
+For Darkmesh 0.1.57 or newer, the confirmed local `applyCommand` includes
+`--replace-host-policy` so an operator's chosen posture can replace a saved
+host Tailscale requirement. Ordinary unconfirmed CLI application retains that
+guard. Applying a Tailscale-forbidden profile disconnects private-overlay access.
+
 `postures[].set_command` and `applyCommand` are the only mutating hooks, and both
 always present an explicit confirmation before execution. No command is
 shell-interpolated. Set only values

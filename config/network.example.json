@@ -6,7 +6,7 @@
   "topologyCommand": ["/opt/homebrew/bin/darkmesh", "posture", "topology", "--json"],
   "probeCommand": ["/opt/homebrew/bin/darkmesh", "posture", "probe", "--json"],
   "activeProbeTimeoutSeconds": 120,
-  "applyCommand": ["/opt/homebrew/bin/darkmesh", "posture", "apply", "{profile}"],
+  "applyCommand": ["/opt/homebrew/bin/darkmesh", "posture", "apply", "{profile}", "--replace-host-policy"],
   "postures": [],
   "probes": [
     { "id": "local-health", "label": "Run local health", "command": ["/opt/homebrew/bin/darkmesh", "posture", "health", "--json"], "required": true, "timeoutSeconds": 20 },

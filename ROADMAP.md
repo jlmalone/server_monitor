@@ -97,6 +97,15 @@ as provisional, exposes deferred/in-progress/failed states, and fails closed on
 unavailable or malformed configured receipt data. Cryptographic destination-proof
 verification remains a future trusted-boundary integration.
 
+## Manager queue progress — shipped
+
+Manager commands can emit a structured queue admission containing the configured
+source label and exact queue ID. The app follows only fresh entries with matching
+route and mode, shows queued/running progress, and opens Queue instead of
+offering a duplicate enqueue retry. Files also shows existing active queue work
+after restart. Exit-zero commands without an admission and completed queue
+entries remain unverified until destination evidence is available.
+
 ## Operator secrets sync — shipped
 
 `sm secrets-sync` copies a configured secrets directory to SSH peers listed in

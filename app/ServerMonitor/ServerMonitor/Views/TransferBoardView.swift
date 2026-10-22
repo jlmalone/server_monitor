@@ -105,15 +105,20 @@ final class PaneModel: ObservableObject {
 
 struct ManagerView: View {
     @ObservedObject var actions: TransferActionsModel
+    @ObservedObject var transfers: TransfersMonitor
     let showLogs: () -> Void
+    let showQueue: () -> Void
     @StateObject private var chicklets: ChickletStore
     @StateObject private var left: PaneModel
     @StateObject private var right: PaneModel
     @State private var pending: PendingTransfer?
 
-    init(actions: TransferActionsModel, showLogs: @escaping () -> Void = {}) {
+    init(actions: TransferActionsModel, transfers: TransfersMonitor,
+         showLogs: @escaping () -> Void = {}, showQueue: @escaping () -> Void = {}) {
         _actions = ObservedObject(wrappedValue: actions)
+        _transfers = ObservedObject(wrappedValue: transfers)
         self.showLogs = showLogs
+        self.showQueue = showQueue
         _chicklets = StateObject(wrappedValue: ChickletStore(path: actions.chickletsPath))
         let ms = actions.machines
         _left = StateObject(wrappedValue: PaneModel(machine: ms.first, machines: ms))
@@ -126,6 +131,20 @@ struct ManagerView: View {
                 VStack(spacing: 0) {
                     if let operation = actions.operations.first {
                         latestOperation(operation)
+                        Divider()
+                    } else if let row = transfers.queueRows.first(where: { $0.status == "running" || $0.status == "pending" }) {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(row.title).font(.callout.bold()).lineLimit(1).truncationMode(.middle)
+                                Text(([row.status == "running" ? "Transfer in progress" : "Queued; waiting to start"] +
+                                      [row.pctText, row.rateText, row.etaText].compactMap { $0 }).joined(separator: " · "))
+                                    .font(.caption2).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button("View Queue", action: showQueue).buttonStyle(.borderless).font(.caption)
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 6)
                         Divider()
                     }
                     HSplitView {
@@ -145,6 +164,7 @@ struct ManagerView: View {
             TransferConfirmSheet(actions: actions, payload: p.payload,
                                  destMachine: p.destMachine, destPath: p.destPath) { pending = nil }
         }
+        .onAppear { transfers.refresh() }
     }
 
     private func latestOperation(_ operation: TransferOperation) -> some View {
@@ -157,7 +177,8 @@ struct ManagerView: View {
                     .foregroundColor(operation.state == .failed ? .red : (operation.state == .provisional ? .orange : .secondary))
             }
             Spacer()
-            Button("View Log", action: showLogs)
+            Button(operation.queueID == nil ? "View Log" : "View Queue",
+                   action: operation.queueID == nil ? showLogs : showQueue)
                 .buttonStyle(.borderless)
                 .font(.caption)
         }
@@ -166,7 +187,10 @@ struct ManagerView: View {
     }
 
     private func operationSummary(_ operation: TransferOperation) -> String {
+        if operation.queueID != nil { return operation.queueSummary }
         switch operation.state {
+        case .queued:
+            return operation.queueSummary
         case .running:
             return "\(operation.mode.rawValue) attempt \(operation.attempt)/\(operation.maxAttempts) is running"
         case .retrying:
@@ -765,6 +789,7 @@ struct TransferLogsView: View {
 
     private func stateLabel(_ s: TransferState) -> String {
         switch s {
+        case .queued: return "queued"
         case .running:   return "running"
         case .retrying:  return "retrying after a failure"
         case .provisional: return "delivery unverified"
@@ -780,6 +805,7 @@ struct TransferStateDot: View {
     var body: some View {
         Group {
             switch state {
+            case .queued: ProgressView().controlSize(.small)
             case .running:   ProgressView().controlSize(.small)
             case .retrying:  Image(systemName: "clock.arrow.circlepath").foregroundColor(.orange)
             case .provisional: Image(systemName: "exclamationmark.circle.fill").foregroundColor(.orange)
@@ -855,7 +881,9 @@ struct LogTailView: View {
     }
 
     private var statusLine: String {
+        if op.queueID != nil { return op.queueSummary }
         switch op.state {
+        case .queued: return op.queueSummary
         case .running:   return "attempt \(op.attempt)/\(op.maxAttempts) · running"
         case .retrying:  return "attempt \(op.attempt)/\(op.maxAttempts) failed · waiting to retry"
         case .provisional: return "exit 0 on attempt \(op.attempt); delivery unverified"
@@ -876,8 +904,10 @@ struct LogTailView: View {
             Button { actions.stop(op.id) } label: { Label("Stop", systemImage: "stop.fill") }
                 .buttonStyle(.borderless).font(.caption).foregroundColor(.red).accessibilityLabel("Stop retrying")
         case .failed, .stopped:
-            Button { actions.retry(op.id) } label: { Label("Retry", systemImage: "arrow.clockwise") }
-                .buttonStyle(.borderless).font(.caption).accessibilityLabel("Retry from the first attempt")
+            if op.queueID == nil {
+                Button { actions.retry(op.id) } label: { Label("Retry", systemImage: "arrow.clockwise") }
+                    .buttonStyle(.borderless).font(.caption).accessibilityLabel("Retry from the first attempt")
+            }
         default:
             EmptyView()
         }

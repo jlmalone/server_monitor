@@ -237,6 +237,8 @@ struct TransferRow: Identifiable {
 @MainActor
 final class TransfersMonitor: ObservableObject {
     @Published private(set) var rows: [TransferRow] = []
+    /// Fresh queue entries, including terminal states, for exact Manager bindings.
+    @Published private(set) var queueRows: [TransferRow] = []
     @Published private(set) var running = 0
     @Published private(set) var pending = 0
     @Published private(set) var failed = 0
@@ -312,12 +314,20 @@ final class TransfersMonitor: ObservableObject {
         isRefreshing = true
         Task.detached {
             var allRows: [TransferRow] = []
+            var managerRows: [TransferRow] = []
             var r = 0, p = 0, f = 0
             var queueRunning = 0, queueFailed = 0, receiptAttention = 0
             var warnings: [String] = []
             for src in cfg.sources {
                 if let data = Self.readSource(src, timeout: cfg.timeoutSeconds ?? 30),
                    let report = try? JSONDecoder().decode(TransfersQueueReport.self, from: data) {
+                    let snapshotIsFresh = SnapshotFreshness.staleReason(
+                        timestamp: report.generatedAt, filePath: src.statusFile,
+                        maxAge: max(10, src.maxActiveSnapshotAgeSeconds ?? 30), label: src.label
+                    ) == nil
+                    if snapshotIsFresh {
+                        managerRows.append(contentsOf: report.queue.map { Self.toRow($0, source: src) })
+                    }
                     let hasActiveQueue = report.summary.running > 0 || report.summary.pending > 0
                     if hasActiveQueue {
                         // A fresh active queue snapshot is direct proof that the producer is
@@ -385,11 +395,13 @@ final class TransfersMonitor: ObservableObject {
                 return a != b ? a < b : $0.sortPct > $1.sortPct
             }
             let fRows = allRows, fr = r, fp = p, ff = f
+            let fManagerRows = managerRows
             let fqr = queueRunning, fqf = queueFailed, fra = receiptAttention
             let warning = warnings.isEmpty ? nil : warnings.joined(separator: " · ")
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.rows = fRows
+                self.queueRows = fManagerRows
                 self.running = fr
                 self.pending = fp
                 self.failed = ff

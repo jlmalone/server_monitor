@@ -25,7 +25,7 @@ struct ServerMonitorApp: App {
         let worker = WorkerStatusMonitor()
         let lidSleep = LidSleepMonitor()
         let transfers = TransfersMonitor()
-        let transferActions = TransferActionsModel()
+        let transferActions = TransferActionsModel(transfers: transfers)
         let protection = ProtectionMonitor()
         let versions = VersionMonitor()
         let autoRegisterBackgroundServices =

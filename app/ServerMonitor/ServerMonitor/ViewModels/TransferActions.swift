@@ -1,4 +1,5 @@
 import Darwin
+import Combine
 import Foundation
 import SwiftUI
 
@@ -228,7 +229,7 @@ enum TransferMode: String { case copy = "Copy", move = "Move" }
 /// `provisional` means only that the configured process exited zero. It is not a
 /// destination-delivery assertion; only a trusted receipt-verification boundary
 /// may make a delivery claim.
-enum TransferState { case running, retrying, provisional, failed, stopped }
+enum TransferState { case running, retrying, queued, provisional, failed, stopped }
 
 struct TransferOperation: Identifiable {
     let id: String
@@ -242,8 +243,31 @@ struct TransferOperation: Identifiable {
     var attempt: Int
     let maxAttempts: Int
     var nextRetryAt: Date?
+    var queueID: String?
+    var queueSourceLabel: String?
+    var queueRow: TransferRow?
 
     var routeText: String { "\(src) → \(dst)" }
+
+    var queueSummary: String {
+        guard let row = queueRow else { return "Queued; waiting for current status" }
+        switch row.status {
+        case "running":
+            return (["\(mode.rawValue) in progress"] + [row.pctText, row.rateText, row.etaText].compactMap { $0 })
+                .joined(separator: " · ")
+        case "pending": return "Queued; waiting to start"
+        case "failed": return "Queued transfer failed; see Queue for details"
+        case "cancelled": return "Queued transfer cancelled"
+        case "completed": return "Queue finished; destination verification required"
+        default: return "Queued; status unavailable"
+        }
+    }
+}
+
+/// Optional command-output contract. Admission identifies work, never delivery.
+private struct ManagerQueueAdmission: Decodable {
+    let sourceLabel: String
+    let queueID: String
 }
 
 private struct TransferArgs {
@@ -272,8 +296,11 @@ final class TransferActionsModel: ObservableObject {
     private var runningProcesses: [String: Process] = [:]
     /// Per-op argument tuple so retries rebuild the command without re-deriving it.
     private var opArgs: [String: TransferArgs] = [:]
+    private var queueSubscription: AnyCancellable?
+    private var queueRows: [TransferRow] = []
+    private weak var transfers: TransfersMonitor?
 
-    init() {
+    init(transfers: TransfersMonitor? = nil) {
         let cfg = ManagerConfig.load()
         self.config = cfg
         self.configured = (cfg?.transferCommand?.isEmpty == false) && (cfg?.machines?.isEmpty == false)
@@ -282,6 +309,11 @@ final class TransferActionsModel: ObservableObject {
         self.chickletsPath = cfg?.chickletsPath
         self.maxAttempts = max(1, cfg?.maxAttempts ?? 5)
         self.backoffBase = max(0.5, cfg?.backoffBaseSeconds ?? 2)
+        self.transfers = transfers
+        queueSubscription = transfers?.$queueRows.sink { [weak self] rows in
+            self?.queueRows = rows
+            self?.synchronizeQueue()
+        }
     }
 
     var activeCount: Int {
@@ -289,13 +321,15 @@ final class TransferActionsModel: ObservableObject {
     }
 
     var failedCount: Int {
-        operations.filter { $0.state == .failed }.count
+        operations.filter { $0.state == .failed && $0.queueID == nil }.count
     }
 
     /// An exit-zero Manager command is provisional until a trusted boundary
     /// proves the destination; it must keep the aggregate status off green.
     var needsAttention: Bool {
-        operations.contains { $0.state == .failed || $0.state == .provisional }
+        operations.contains {
+            $0.state == .failed || $0.state == .provisional || ($0.state == .queued && $0.queueRow == nil)
+        }
     }
 
     /// True when `mode` is available (Copy always; Move only if enabled).
@@ -325,6 +359,8 @@ final class TransferActionsModel: ObservableObject {
     }
 
     func stop(_ id: String) {
+        guard let op = operations.first(where: { $0.id == id }), op.queueID == nil,
+              op.state == .running || op.state == .retrying else { return }
         cancelTimer(id)
         update(id) { $0.state = .stopped; $0.nextRetryAt = nil }
         if let process = runningProcesses[id], process.isRunning {
@@ -340,7 +376,7 @@ final class TransferActionsModel: ObservableObject {
     func retry(_ id: String) {
         cancelTimer(id)
         guard runningProcesses[id] == nil else { return }
-        guard let op = operations.first(where: { $0.id == id }) else { return }
+        guard let op = operations.first(where: { $0.id == id }), op.queueID == nil else { return }
         guard op.state == .failed || op.state == .stopped else { return }
         update(id) { $0.attempt = 0; $0.state = .running; $0.nextRetryAt = nil }
         runAttempt(id)
@@ -384,8 +420,33 @@ final class TransferActionsModel: ObservableObject {
 
     private func completed(_ id: String, ok: Bool) {
         guard let op = operations.first(where: { $0.id == id }) else { return }
-        if ok { update(id) { $0.state = .provisional; $0.nextRetryAt = nil }; return }
         if op.state == .stopped { return }
+        let prefix = "SERVER_MONITOR_QUEUE "
+        let admissionLines = Self.tail(op.logPath).components(separatedBy: "\n").filter { $0.hasPrefix(prefix) }
+        let admissions = admissionLines.compactMap { line -> ManagerQueueAdmission? in
+            guard let data = String(line.dropFirst(prefix.count)).data(using: .utf8),
+                  let admission = try? JSONDecoder().decode(ManagerQueueAdmission.self, from: data),
+                  !admission.sourceLabel.isEmpty,
+                  admission.queueID.range(of: "^[A-Za-z0-9_-]{1,128}$", options: .regularExpression) != nil else { return nil }
+            return admission
+        }
+        if admissionLines.count == 1, let admission = admissions.first {
+            update(id) {
+                $0.queueID = admission.queueID
+                $0.queueSourceLabel = admission.sourceLabel
+                $0.state = .queued
+                $0.nextRetryAt = nil
+            }
+            synchronizeQueue()
+            transfers?.refresh()
+            return
+        }
+        if !admissionLines.isEmpty {
+            // An ambiguous admission must never cause a second enqueue attempt.
+            update(id) { $0.state = .provisional; $0.nextRetryAt = nil }
+            return
+        }
+        if ok { update(id) { $0.state = .provisional; $0.nextRetryAt = nil }; return }
         guard op.attempt < op.maxAttempts else {
             update(id) { $0.state = .failed; $0.nextRetryAt = nil }
             Self.appendLine(op.logPath, "— gave up after \(op.attempt) attempts —")
@@ -399,6 +460,26 @@ final class TransferActionsModel: ObservableObject {
             Task { @MainActor [weak self] in self?.fireRetry(id) }
         }
         retryTimers[id] = t
+    }
+
+    private func synchronizeQueue() {
+        for index in operations.indices {
+            let op = operations[index]
+            guard let queueID = op.queueID, let sourceLabel = op.queueSourceLabel,
+                  let args = opArgs[op.id] else { continue }
+            let matches = queueRows.filter {
+                $0.queueID == queueID && $0.machine == sourceLabel &&
+                $0.sourcePath == args.srcPath && $0.destination == op.dst &&
+                $0.mode?.lowercased() == (op.mode == .copy ? "copy" : "move")
+            }
+            operations[index].queueRow = matches.count == 1 ? matches.first : nil
+            switch operations[index].queueRow?.status {
+            case "failed": operations[index].state = .failed
+            case "cancelled": operations[index].state = .stopped
+            case "completed": operations[index].state = .provisional
+            default: operations[index].state = .queued
+            }
+        }
     }
 
     private func fireRetry(_ id: String) {

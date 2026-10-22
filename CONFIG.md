@@ -159,9 +159,23 @@ menu-bar transfer status off green. This is fail-closed: it supplies no
 delivery evidence and does not change the legacy queue snapshot behavior when no
 receipt source is configured.
 
-Manager transfer commands remain separate from receipt sources: exit zero means
-only **delivery unverified** until trusted destination proof exists, and keeps the
-combined menu-bar tint off green.
+Manager transfer commands remain separate from receipt sources. A command that
+enqueues work can print exactly one admission line:
+
+```text
+SERVER_MONITOR_QUEUE {"sourceLabel":"workstation","queueID":"transfer-123"}
+```
+
+`sourceLabel` must equal a configured transfer source's label. Manager binds that
+ID only to a fresh queue entry with the same source path, destination and mode.
+It shows queued/running progress and routes View Queue to the existing entry's
+queue, without offering a second enqueue through Manager Retry. The admission
+is retained even when the command subsequently exits nonzero. Malformed or
+ambiguous admission output never triggers an automatic enqueue retry. Commands
+without this contract retain the exit-zero **delivery unverified** behavior.
+Completed queue entries still require trusted destination evidence before any
+delivery claim. Active entries also appear in the Files banner after app restart,
+without recreating or resubmitting the original operation.
 
 The Manager window's **History** tab reads `history.command`, which must print **one
 JSON object per line**, each shaped like `{ "id","repositories":[…],"sourceMachine",

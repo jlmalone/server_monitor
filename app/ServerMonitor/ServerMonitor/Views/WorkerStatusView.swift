@@ -72,7 +72,7 @@ struct TransfersView: View {
 
     private var managerOperations: [TransferOperation] {
         actions.operations.filter {
-            $0.state == .running || $0.state == .retrying || $0.state == .failed
+            $0.queueID == nil && ($0.state == .running || $0.state == .retrying || $0.state == .failed)
         }
     }
     private var running: Int { monitor.running + actions.activeCount }
@@ -169,6 +169,7 @@ struct TransfersView: View {
 
     private func managerStatus(_ operation: TransferOperation) -> String {
         switch operation.state {
+        case .queued: return "queued"
         case .running: return "attempt \(operation.attempt)/\(operation.maxAttempts)"
         case .retrying: return "retrying"
         case .failed: return "failed"
@@ -301,8 +302,12 @@ struct TransferHistoryWindow: View {
     private var selectedContent: some View {
         switch selectedTab {
         case .files:
-            ManagerView(actions: actions, showLogs: {
+            ManagerView(actions: actions, transfers: transfers, showLogs: {
                 activitySection = .managerLogs
+                selectedTab = .logs
+            }, showQueue: {
+                activitySection = .queue
+                queueFailedOnly = false
                 selectedTab = .logs
             })
         case .history:

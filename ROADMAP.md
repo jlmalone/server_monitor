@@ -106,6 +106,13 @@ offering a duplicate enqueue retry. Files also shows existing active queue work
 after restart. Exit-zero commands without an admission and completed queue
 entries remain unverified until destination evidence is available.
 
+Copy and Move have separate labeled symbol badges in the Files banner, queue,
+menu panel and Manager logs. Blue overlapping documents identify Copy; a purple
+arrow identifies Move. Tooltips and accessibility labels explain whether the
+source stays or is removed after verified delivery. The spinner remains separate
+from mode; active Files banners also show a mode-colored progress bar when the
+queue supplies a total. Unknown modes receive no guessed badge.
+
 ## Operator secrets sync — shipped
 
 `sm secrets-sync` copies a configured secrets directory to SSH peers listed in

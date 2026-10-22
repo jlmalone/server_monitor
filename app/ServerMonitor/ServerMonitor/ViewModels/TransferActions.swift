@@ -225,7 +225,24 @@ final class ChickletStore: ObservableObject {
 
 // MARK: - Transfer operations engine (Logs tab)
 
-enum TransferMode: String { case copy = "Copy", move = "Move" }
+enum TransferMode: String {
+    case copy = "Copy", move = "Move"
+
+    static func fromQueue(_ value: String?) -> TransferMode? {
+        switch value?.lowercased() {
+        case "copy": return .copy
+        case "move": return .move
+        default: return nil
+        }
+    }
+
+    var symbol: String { self == .copy ? "doc.on.doc" : "arrow.right.square" }
+    var color: Color { self == .copy ? .blue : .purple }
+    var activityLabel: String { self == .copy ? "Copying" : "Moving" }
+    var sourceDescription: String {
+        self == .copy ? "Source kept" : "Source removed only after verified delivery"
+    }
+}
 /// `provisional` means only that the configured process exited zero. It is not a
 /// destination-delivery assertion; only a trusted receipt-verification boundary
 /// may make a delivery claim.
@@ -253,9 +270,9 @@ struct TransferOperation: Identifiable {
         guard let row = queueRow else { return "Queued; waiting for current status" }
         switch row.status {
         case "running":
-            return (["\(mode.rawValue) in progress"] + [row.pctText, row.rateText, row.etaText].compactMap { $0 })
+            return ([mode.activityLabel] + [row.pctText, row.rateText, row.etaText].compactMap { $0 })
                 .joined(separator: " · ")
-        case "pending": return "Queued; waiting to start"
+        case "pending": return "\(mode.rawValue) queued; waiting to start"
         case "failed": return "Queued transfer failed; see Queue for details"
         case "cancelled": return "Queued transfer cancelled"
         case "completed": return "Queue finished; destination verification required"

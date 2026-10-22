@@ -152,6 +152,7 @@ struct TransfersView: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 6) {
                 TransferStateDot(state: operation.state)
+                TransferModeBadge(mode: operation.mode)
                 Text(operation.title)
                     .font(.caption.bold())
                     .lineLimit(1)
@@ -195,6 +196,7 @@ struct TransfersView: View {
                 }
             }
             HStack(spacing: 8) {
+                TransferModeBadge(mode: TransferMode.fromQueue(row.mode))
                 Text(row.machine).font(.caption2).foregroundColor(.secondary)
                 if let rate = row.rateText {
                     Text(rate).font(.caption2).foregroundColor(.secondary)

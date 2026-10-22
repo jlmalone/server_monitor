@@ -135,11 +135,13 @@ struct ManagerView: View {
                     } else if let row = transfers.queueRows.first(where: { $0.status == "running" || $0.status == "pending" }) {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
+                            TransferModeBadge(mode: TransferMode.fromQueue(row.mode))
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(row.title).font(.callout.bold()).lineLimit(1).truncationMode(.middle)
-                                Text(([row.status == "running" ? "Transfer in progress" : "Queued; waiting to start"] +
+                                Text(([row.status == "running" ? (TransferMode.fromQueue(row.mode)?.activityLabel ?? "Transfer in progress") : "Queued; waiting to start"] +
                                       [row.pctText, row.rateText, row.etaText].compactMap { $0 }).joined(separator: " · "))
                                     .font(.caption2).foregroundColor(.secondary)
+                                TransferProgressBar(row: row)
                             }
                             Spacer()
                             Button("View Queue", action: showQueue).buttonStyle(.borderless).font(.caption)
@@ -170,11 +172,13 @@ struct ManagerView: View {
     private func latestOperation(_ operation: TransferOperation) -> some View {
         HStack(spacing: 8) {
             TransferStateDot(state: operation.state)
+            TransferModeBadge(mode: operation.mode)
             VStack(alignment: .leading, spacing: 1) {
                 Text(operation.title).font(.callout.bold()).lineLimit(1).truncationMode(.middle)
                 Text(operationSummary(operation))
                     .font(.caption2)
                     .foregroundColor(operation.state == .failed ? .red : (operation.state == .provisional ? .orange : .secondary))
+                if let row = operation.queueRow { TransferProgressBar(row: row) }
             }
             Spacer()
             Button(operation.queueID == nil ? "View Log" : "View Queue",
@@ -192,7 +196,7 @@ struct ManagerView: View {
         case .queued:
             return operation.queueSummary
         case .running:
-            return "\(operation.mode.rawValue) attempt \(operation.attempt)/\(operation.maxAttempts) is running"
+            return "\(operation.mode.activityLabel) · attempt \(operation.attempt)/\(operation.maxAttempts)"
         case .retrying:
             return "Attempt \(operation.attempt)/\(operation.maxAttempts) failed; waiting to retry"
         case .provisional:
@@ -671,8 +675,11 @@ private struct TransferQueueActivityView: View {
                                              row.status == "running" ? .green : .secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(row.title).lineLimit(1).truncationMode(.middle)
-                            Text("\(row.machine) · \(row.statusText)")
-                                .font(.caption).foregroundColor(.secondary)
+                            HStack(spacing: 6) {
+                                TransferModeBadge(mode: TransferMode.fromQueue(row.mode))
+                                Text("\(row.machine) · \(row.statusText)")
+                                    .font(.caption).foregroundColor(.secondary)
+                            }
                             if let detail = row.failureDetail, row.status == "failed" {
                                 Text(detail).font(.caption2).foregroundColor(.orange)
                                     .lineLimit(2).help(detail)
@@ -767,6 +774,7 @@ struct TransferLogsView: View {
                 List(actions.operations, selection: $selection) { op in
                     HStack(spacing: 8) {
                         TransferStateDot(state: op.state)
+                        TransferModeBadge(mode: op.mode)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(op.title).font(.callout).lineLimit(1).truncationMode(.middle)
                             Text("\(op.mode.rawValue) · \(op.routeText)")
@@ -817,6 +825,38 @@ struct TransferStateDot: View {
     }
 }
 
+/// Mode and lifecycle remain separate: a spinner never replaces Copy/Move.
+struct TransferModeBadge: View {
+    let mode: TransferMode?
+
+    var body: some View {
+        if let mode {
+            Label(mode.rawValue, systemImage: mode.symbol)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(mode.color)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(mode.color.opacity(0.12), in: Capsule())
+                .fixedSize()
+                .help("\(mode.rawValue): \(mode.sourceDescription)")
+                .accessibilityLabel("\(mode.rawValue). \(mode.sourceDescription)")
+        }
+    }
+}
+
+struct TransferProgressBar: View {
+    let row: TransferRow
+
+    var body: some View {
+        if row.status == "running", row.sortPct >= 0 {
+            ProgressView(value: Double(min(row.sortPct, 100)), total: 100)
+                .progressViewStyle(.linear)
+                .tint(TransferMode.fromQueue(row.mode)?.color ?? .accentColor)
+                .frame(maxWidth: 260)
+                .accessibilityLabel("Transfer progress")
+        }
+    }
+}
+
 /// Polls the operation's log file so the view follows a running transfer live,
 /// and reads it once more when the op finishes.
 @MainActor
@@ -853,6 +893,7 @@ struct LogTailView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 TransferStateDot(state: op.state)
+                TransferModeBadge(mode: op.mode)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(op.title).font(.headline).lineLimit(1).truncationMode(.middle)
                     Text(statusLine).font(.caption2).foregroundColor(.secondary)

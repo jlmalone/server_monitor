@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import Network
 
-private struct ManagedChildConfig: Decodable {
+private struct ManagedChildConfig: Decodable, Equatable {
     let id: String
     let command: [String]
     let restartDelaySeconds: Double?
@@ -10,7 +10,7 @@ private struct ManagedChildConfig: Decodable {
     let maxSilenceSeconds: Double?
 }
 
-private struct ScheduledJobConfig: Decodable {
+private struct ScheduledJobConfig: Decodable, Equatable {
     let id: String
     let command: [String]
     let intervalSeconds: Double
@@ -55,7 +55,7 @@ private struct AgentStatus: Encodable {
 }
 
 private final class RunningChild {
-    let config: ManagedChildConfig
+    var config: ManagedChildConfig
     let process: Process
     let logHandle: FileHandle
     let logURL: URL
@@ -84,22 +84,26 @@ private final class InfrastructureSupervisor {
         return encoder
     }()
 
-    private let configURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/server-monitor/infrastructure-agent.json")
-    private let logDirectory = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/ServerMonitor/InfrastructureAgent", isDirectory: true)
-    private let defaultStatusURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/ServerMonitor/infrastructure-agent-status.json")
+    private let configURL: URL
+    private let logDirectory: URL
+    private let defaultStatusURL: URL
 
     private var config: AgentConfig?
     private var configError: String?
     private var configModifiedAt: Date?
-    private var reloadDeferred = false
     private var children: [String: RunningChild] = [:]
     private var childLastExit: [String: Int32] = [:]
     private var terminatingChildPIDs: [String: Int32] = [:]
     private var jobTimers: [String: DispatchSourceTimer] = [:]
+    private var jobTimerConfigs: [String: ScheduledJobConfig] = [:]
+    private var jobTimerTokens: [String: UUID] = [:]
+    private struct PendingRestart {
+        let token: UUID
+        let work: DispatchWorkItem
+    }
+    private var childRestarts: [String: PendingRestart] = [:]
     private var activeJobIDs: Set<String> = []
+    private var activeJobConfigs: [String: ScheduledJobConfig] = [:]
     private var activeJobProcesses: [String: Process] = [:]
     private var jobLastRun: [String: String] = [:]
     private var jobLastExit: [String: Int32] = [:]
@@ -109,6 +113,26 @@ private final class InfrastructureSupervisor {
     private var lastHeartbeatAt = Date.distantPast
     private var maintenanceTimer: DispatchSourceTimer?
     private var shuttingDown = false
+
+    init() {
+        let userDirectory = FileManager.default.homeDirectoryForCurrentUser
+        // An explicit isolated root permits real supervisor integration without
+        // reading or replacing the operator's live configuration, logs or status.
+        if let raw = ProcessInfo.processInfo.environment["SERVERMONITOR_INFRASTRUCTURE_ROOT"] {
+            guard (raw as NSString).isAbsolutePath else {
+                fputs("Infrastructure root must be absolute\n", stderr)
+                Darwin.exit(78)
+            }
+            let root = URL(fileURLWithPath: raw, isDirectory: true)
+            configURL = root.appendingPathComponent("infrastructure-agent.json")
+            logDirectory = root.appendingPathComponent("logs", isDirectory: true)
+            defaultStatusURL = root.appendingPathComponent("status.json")
+        } else {
+            configURL = userDirectory.appendingPathComponent(".config/server-monitor/infrastructure-agent.json")
+            logDirectory = userDirectory.appendingPathComponent("Library/Logs/ServerMonitor/InfrastructureAgent", isDirectory: true)
+            defaultStatusURL = userDirectory.appendingPathComponent("Library/Application Support/ServerMonitor/infrastructure-agent-status.json")
+        }
+    }
 
     func start() {
         stateQueue.async {
@@ -129,6 +153,10 @@ private final class InfrastructureSupervisor {
             self.pathMonitor.cancel()
             self.jobTimers.values.forEach { $0.cancel() }
             self.jobTimers.removeAll()
+            self.jobTimerConfigs.removeAll()
+            self.jobTimerTokens.removeAll()
+            self.childRestarts.values.forEach { $0.work.cancel() }
+            self.childRestarts.removeAll()
             for child in self.children.values where child.process.isRunning {
                 child.process.terminate()
             }
@@ -178,12 +206,6 @@ private final class InfrastructureSupervisor {
     private func reloadConfiguration(force: Bool) {
         let modified = (try? FileManager.default.attributesOfItem(atPath: configURL.path)[.modificationDate]) as? Date
         guard force || modified != configModifiedAt else { return }
-        guard activeJobIDs.isEmpty else {
-            if !reloadDeferred { log("configuration reload deferred while scheduled work is active") }
-            reloadDeferred = true
-            return
-        }
-        reloadDeferred = false
         configModifiedAt = modified
 
         do {
@@ -194,9 +216,10 @@ private final class InfrastructureSupervisor {
                               userInfo: [NSLocalizedDescriptionKey: "unsupported config schema \(decoded.schema)"])
             }
             try validate(decoded)
+            let watchPathsChanged = config?.watchPaths != decoded.watchPaths
             config = decoded
             configError = nil
-            networkFingerprint = fingerprint(decoded.watchPaths ?? [])
+            if watchPathsChanged { networkFingerprint = fingerprint(decoded.watchPaths ?? []) }
             reconfigureManagedWork(decoded)
             log("configuration loaded")
             writeStatus()
@@ -230,20 +253,48 @@ private final class InfrastructureSupervisor {
     }
 
     private func reconfigureManagedWork(_ newConfig: AgentConfig) {
-        stopManagedWork()
-        for child in newConfig.persistentChildren { startChild(child) }
-        for job in newConfig.scheduledJobs { startTimer(for: job) }
+        let desiredChildren = Dictionary(uniqueKeysWithValues: newConfig.persistentChildren.map { ($0.id, $0) })
+        for id in Array(childRestarts.keys) where desiredChildren[id] == nil {
+            childRestarts.removeValue(forKey: id)?.work.cancel()
+        }
+        for child in children.values {
+            guard let desired = desiredChildren[child.config.id] else {
+                recycleChild(child, reason: "removed from configuration")
+                continue
+            }
+            if child.config.command == desired.command {
+                // Policy changes do not need a new process or a second producer.
+                child.config = desired
+            } else {
+                // Keep the old handle until actual exit. Never start a replacement
+                // while the previous owner may still hold its listener or work.
+                recycleChild(child, reason: "command changed")
+            }
+        }
+        for child in newConfig.persistentChildren where children[child.id] == nil && childRestarts[child.id] == nil {
+            startChild(child)
+        }
+
+        let desiredJobs = Dictionary(uniqueKeysWithValues: newConfig.scheduledJobs.map { ($0.id, $0) })
+        for id in Array(jobTimers.keys) where jobTimerConfigs[id] != desiredJobs[id] {
+            jobTimers.removeValue(forKey: id)?.cancel()
+            jobTimerConfigs.removeValue(forKey: id)
+            jobTimerTokens.removeValue(forKey: id)
+        }
+        for job in newConfig.scheduledJobs where jobTimers[job.id] == nil { startTimer(for: job) }
     }
 
     private func stopManagedWork() {
         jobTimers.values.forEach { $0.cancel() }
         jobTimers.removeAll()
-        activeJobIDs.removeAll()
+        jobTimerConfigs.removeAll()
+        jobTimerTokens.removeAll()
+        childRestarts.values.forEach { $0.work.cancel() }
+        childRestarts.removeAll()
+        // In-flight scheduled work retains its admission fence and normal timeout.
         for child in children.values {
-            if child.process.isRunning { child.process.terminate() }
-            try? child.logHandle.close()
+            recycleChild(child, reason: "configuration unavailable")
         }
-        children.removeAll()
     }
 
     private func startChild(_ childConfig: ManagedChildConfig) {
@@ -252,7 +303,7 @@ private final class InfrastructureSupervisor {
         // instance with the same ID is already running. Treat that as a no-op;
         // scheduling another retry here would create an endless restart-timer
         // chain and falsely report exit 127 for a healthy child.
-        guard children[childConfig.id] == nil else { return }
+        guard children[childConfig.id] == nil, childRestarts[childConfig.id] == nil else { return }
         guard let command = resolvedCommand(childConfig.command) else {
             childLastExit[childConfig.id] = 127
             writeStatus()
@@ -278,7 +329,9 @@ private final class InfrastructureSupervisor {
                 self.childLastExit[childConfig.id] = finished.terminationStatus
                 self.log("child \(childConfig.id) exited \(finished.terminationStatus)")
                 self.writeStatus()
-                self.scheduleChildRestart(childConfig)
+                if let desired = self.config?.persistentChildren.first(where: { $0.id == childConfig.id }) {
+                    self.scheduleChildRestart(desired)
+                }
             }
         }
         do {
@@ -303,15 +356,21 @@ private final class InfrastructureSupervisor {
 
     private func scheduleChildRestart(_ childConfig: ManagedChildConfig) {
         guard !shuttingDown,
-              config?.persistentChildren.contains(where: { $0.id == childConfig.id }) == true else { return }
+              config?.persistentChildren.contains(where: { $0.id == childConfig.id }) == true,
+              childRestarts[childConfig.id] == nil else { return }
         let delay = max(1, childConfig.restartDelaySeconds ?? 10)
-        stateQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+        let token = UUID()
+        let work = DispatchWorkItem { [weak self] in
             guard let self, !self.shuttingDown,
+                  self.childRestarts[childConfig.id]?.token == token,
                   let current = self.config?.persistentChildren.first(where: { $0.id == childConfig.id }) else {
                 return
             }
+            self.childRestarts.removeValue(forKey: childConfig.id)
             self.startChild(current)
         }
+        childRestarts[childConfig.id] = PendingRestart(token: token, work: work)
+        stateQueue.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func startTimer(for job: ScheduledJobConfig) {
@@ -320,22 +379,29 @@ private final class InfrastructureSupervisor {
             return
         }
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
+        let token = UUID()
         let initial = job.runAtStart == false ? job.intervalSeconds : 1
         timer.schedule(deadline: .now() + initial,
                        repeating: job.intervalSeconds,
                        leeway: .milliseconds(500))
-        timer.setEventHandler { [weak self] in self?.run(job) }
+        timer.setEventHandler { [weak self] in
+            guard let self, self.jobTimerTokens[job.id] == token else { return }
+            self.run(job)
+        }
         timer.resume()
         jobTimers[job.id] = timer
+        jobTimerConfigs[job.id] = job
+        jobTimerTokens[job.id] = token
     }
 
     private func run(_ job: ScheduledJobConfig) {
-        guard !shuttingDown else { return }
+        guard !shuttingDown, config?.scheduledJobs.contains(job) == true else { return }
         guard !activeJobIDs.contains(job.id) else {
             log("job \(job.id) skipped because its previous run is still active")
             return
         }
         activeJobIDs.insert(job.id)
+        activeJobConfigs[job.id] = job
         writeStatus()
         workQueue.async { [weak self] in
             guard let self else { return }
@@ -354,6 +420,7 @@ private final class InfrastructureSupervisor {
             )
             self.stateQueue.async {
                 self.activeJobIDs.remove(job.id)
+                self.activeJobConfigs.removeValue(forKey: job.id)
                 self.activeJobProcesses.removeValue(forKey: job.id)
                 self.jobLastRun[job.id] = ISO8601DateFormatter().string(from: Date())
                 self.jobLastExit[job.id] = result.status
@@ -392,7 +459,8 @@ private final class InfrastructureSupervisor {
         log(reason)
         for child in children.values {
             guard let name = child.config.networkChangeSignal,
-                  let signal = signalNumber(name), child.process.isRunning else { continue }
+                  let signal = signalNumber(name), child.process.isRunning,
+                  terminatingChildPIDs[child.config.id] == nil else { continue }
             Darwin.kill(child.process.processIdentifier, signal)
         }
     }
@@ -414,11 +482,12 @@ private final class InfrastructureSupervisor {
         let pid = process.processIdentifier
         guard process.isRunning, terminatingChildPIDs[child.config.id] != pid else { return }
         terminatingChildPIDs[child.config.id] = pid
-        log("child \(child.config.id) unresponsive/recycling pid=\(pid): \(reason); command=\(child.config.command.joined(separator: " "))")
+        log("child \(child.config.id) recycling pid=\(pid): \(reason)")
         process.terminate()
         writeStatus()
         stateQueue.asyncAfter(deadline: .now() + .seconds(5)) { [weak self, weak process] in
             guard let self, let process, process.isRunning,
+                  self.children[child.config.id]?.process === process,
                   self.terminatingChildPIDs[child.config.id] == pid else { return }
             self.log("child \(child.config.id) ignored SIGTERM for 5s; sending SIGKILL pid=\(pid)")
             Darwin.kill(pid, SIGKILL)
@@ -443,7 +512,10 @@ private final class InfrastructureSupervisor {
     }
 
     private func writeStatus() {
-        let childReports = (config?.persistentChildren ?? []).map { item in
+        let desiredChildren = config?.persistentChildren ?? []
+        let desiredChildIDs = Set(desiredChildren.map(\.id))
+        let stoppingChildren = children.values.map(\.config).filter { !desiredChildIDs.contains($0.id) }.sorted { $0.id < $1.id }
+        let childReports = (desiredChildren + stoppingChildren).map { item in
             let child = children[item.id]
             let process = child?.process
             let running = process?.isRunning == true
@@ -454,7 +526,10 @@ private final class InfrastructureSupervisor {
                                silenceSeconds: silence,
                                lastExitStatus: childLastExit[item.id])
         }
-        let jobReports = (config?.scheduledJobs ?? []).map { item in
+        let desiredJobs = config?.scheduledJobs ?? []
+        let desiredJobIDs = Set(desiredJobs.map(\.id))
+        let drainingJobs = activeJobConfigs.values.filter { !desiredJobIDs.contains($0.id) }.sorted { $0.id < $1.id }
+        let jobReports = (desiredJobs + drainingJobs).map { item in
             JobStatus(id: item.id, intervalSeconds: item.intervalSeconds,
                       running: activeJobIDs.contains(item.id),
                       lastRunAt: jobLastRun[item.id], lastExitStatus: jobLastExit[item.id],

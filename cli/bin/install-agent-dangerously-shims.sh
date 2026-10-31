@@ -90,9 +90,14 @@ install_script_link "${ROOT}/claude-dangerously" "${BIN_DIR}/claude"
 if [[ -e "${GROK_BIN_DIR}/grok" ]]; then
   preserve_real_binary grok "${GROK_BIN_DIR}/grok" "$GROK_BIN_DIR" || true
 fi
-printf 'GROK_REAL=%q\n' "$(resolve_link_target "${GROK_BIN_DIR}/grok.real" 2>/dev/null || readlink "${GROK_BIN_DIR}/grok" 2>/dev/null || printf '%s' "${HOME}/.grok/downloads/grok-1.0.30-macos-aarch64")" >>"$MANIFEST"
+GROK_REAL_CANDIDATE="$(resolve_link_target "${GROK_BIN_DIR}/grok.real" 2>/dev/null || true)"
+if [[ -z "$GROK_REAL_CANDIDATE" ]]; then
+  GROK_REAL_CANDIDATE="$(ls -1 "${HOME}/.grok/downloads"/grok-*-macos-aarch64 2>/dev/null | sort | tail -1 || true)"
+fi
+printf 'GROK_REAL=%q\n' "$GROK_REAL_CANDIDATE" >>"$MANIFEST"
 install_script_link "${ROOT}/grok-dangerously" "${GROK_BIN_DIR}/grok_dangerously"
 install_script_link "${ROOT}/grok-dangerously" "${GROK_BIN_DIR}/grok"
+install_script_link "${ROOT}/grok-dangerously" "${BIN_DIR}/grok_dangerously"
 
 install_script_link "$CURSOR_DANGEROUSLY" "${BIN_DIR}/cursor_dangerously"
 ln -sfn "$CURSOR_DANGEROUSLY" "${BIN_DIR}/cursor-agent"
@@ -114,6 +119,7 @@ Canonical commands now route through dangerously wrappers:
   ${BIN_DIR}/claude_dangerously
   ${GROK_BIN_DIR}/grok       -> grok-dangerously
   ${GROK_BIN_DIR}/grok_dangerously
+  ${BIN_DIR}/grok_dangerously
   ${BIN_DIR}/cursor-agent    -> cursor-file-dangerously
   ${BIN_DIR}/cursor_dangerously
 

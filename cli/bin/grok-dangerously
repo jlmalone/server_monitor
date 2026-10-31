@@ -10,10 +10,29 @@ ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
 # shellcheck source=agent-dangerously-common.sh
 source "${ROOT}/agent-dangerously-common.sh"
 
-GROK_FALLBACK="$(readlink "${HOME}/.grok/bin/grok.real" 2>/dev/null || true)"
-if [[ -z "$GROK_FALLBACK" ]]; then
-  GROK_FALLBACK="$(ls -1 "${HOME}/.grok/downloads"/grok-*-macos-aarch64 2>/dev/null | sort | tail -1)"
-fi
+latest_grok_download() {
+  ls -1 "${HOME}/.grok/downloads"/grok-*-macos-aarch64 2>/dev/null | sort | tail -1
+}
+
+resolve_grok_real_link() {
+  local link="${HOME}/.grok/bin/grok.real"
+  local dir target
+  if [[ -L "$link" ]]; then
+    dir="$(cd "$(dirname "$link")" && pwd)"
+    target="$(readlink "$link")"
+    [[ "$target" != /* ]] && target="${dir}/${target}"
+    if [[ -x "$target" ]]; then
+      printf '%s\n' "$target"
+      return 0
+    fi
+  elif [[ -x "$link" ]]; then
+    printf '%s\n' "$link"
+    return 0
+  fi
+  latest_grok_download
+}
+
+GROK_FALLBACK="$(resolve_grok_real_link)"
 REAL="$(agent_dangerously_resolve_real GROK_REAL "$GROK_FALLBACK")"
 DEFAULT=(
   --always-approve

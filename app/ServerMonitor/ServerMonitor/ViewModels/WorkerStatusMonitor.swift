@@ -327,6 +327,13 @@ final class TransfersMonitor: ObservableObject {
                     ) == nil
                     if snapshotIsFresh {
                         managerRows.append(contentsOf: report.queue.map { Self.toRow($0, source: src) })
+                    } else {
+                        // Completion is historical queue evidence, not a live-progress
+                        // assertion. Keep it visible between idle producer ticks;
+                        // Manager still requires independent destination verification.
+                        managerRows.append(contentsOf: report.queue
+                            .filter { $0.status == "completed" }
+                            .map { Self.toRow($0, source: src) })
                     }
                     let hasActiveQueue = report.summary.running > 0 || report.summary.pending > 0
                     if hasActiveQueue {

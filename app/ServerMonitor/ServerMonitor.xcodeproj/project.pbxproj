@@ -37,6 +37,7 @@
 		A102 /* NetworkPostureMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202 /* NetworkPostureMonitor.swift */; };
 		A103 /* NetworkStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203 /* NetworkStatusView.swift */; };
 		A104 /* TransferReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204 /* TransferReceipt.swift */; };
+		A105 /* StorageStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205 /* StorageStatusView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -105,6 +106,7 @@
 		A202 /* NetworkPostureMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPostureMonitor.swift; sourceTree = "<group>"; };
 		A203 /* NetworkStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkStatusView.swift; sourceTree = "<group>"; };
 		A204 /* TransferReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferReceipt.swift; sourceTree = "<group>"; };
+		A205 /* StorageStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageStatusView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -194,6 +196,7 @@
 				115 /* TransferBoardView.swift */,
 				D921527967B8815AB855C1A7 /* VersionsView.swift */,
 				A203 /* NetworkStatusView.swift */,
+				A205 /* StorageStatusView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -341,6 +344,7 @@
 				A101 /* NetworkPosture.swift in Sources */,
 				A102 /* NetworkPostureMonitor.swift in Sources */,
 				A103 /* NetworkStatusView.swift in Sources */,
+				A105 /* StorageStatusView.swift in Sources */,
 				A104 /* TransferReceipt.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -489,7 +493,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -501,7 +505,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.20;
+				MARKETING_VERSION = 1.2.21;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.ServerMonitor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -515,7 +519,7 @@
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -527,7 +531,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.20;
+				MARKETING_VERSION = 1.2.21;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.ServerMonitor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -540,13 +544,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Server Monitor Infrastructure Agent";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.2.20;
+				MARKETING_VERSION = 1.2.21;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.InfrastructureAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -559,13 +563,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_TEAM = 44SCLSYCZZ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Server Monitor Infrastructure Agent";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.2.20;
+				MARKETING_VERSION = 1.2.21;
 				PRODUCT_BUNDLE_IDENTIFIER = vision.salient.InfrastructureAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

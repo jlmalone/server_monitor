@@ -75,10 +75,12 @@ private struct StatusPopoverContent: View {
     @ObservedObject var transferActions: TransferActionsModel
     @ObservedObject var protection: ProtectionMonitor
     @ObservedObject var versions: VersionMonitor
+    @ObservedObject var storage: StorageMonitor
 
     let openManager: () -> Void
     let openSettings: () -> Void
     let openNetwork: () -> Void
+    let openStorage: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -91,6 +93,12 @@ private struct StatusPopoverContent: View {
             }
             Divider()
             TransfersView(monitor: transfers, actions: transferActions)
+            HStack {
+                Label(storage.localFree.map { "\(StorageDrive.bytes($0)) free" } ?? "Free space unavailable", systemImage: "internaldrive")
+                    .font(.caption).monospacedDigit()
+                Spacer()
+                Button("Storage Status…", action: openStorage).buttonStyle(.borderless).font(.caption)
+            }.padding(.horizontal).padding(.vertical, 6)
             HStack {
                 Button(action: openNetwork) { Label("Network Status…", systemImage: "point.3.connected.trianglepath.dotted").font(.caption) }
                     .buttonStyle(.borderless)
@@ -144,6 +152,8 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     private let versions: VersionMonitor
     private let backgroundService: BackgroundServiceManager
     private var network: NetworkPostureMonitor?
+    private let storage = StorageMonitor()
+    private var storageWindow: NSWindow?
 
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
@@ -213,6 +223,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
     }
 
     @objc private func togglePopover(_ sender: Any?) {
+        storage.refreshLocal()
         guard let button = statusItem?.button else { return }
         if popover.isShown {
             popover.performClose(sender)
@@ -241,9 +252,11 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             transferActions: transferActions,
             protection: protection,
             versions: versions,
+            storage: storage,
             openManager: { [weak self] in self?.showManager() },
             openSettings: { [weak self] in self?.showSettings() },
-            openNetwork: { [weak self] in self?.showNetworkStatus() }
+            openNetwork: { [weak self] in self?.showNetworkStatus() },
+            openStorage: { [weak self] in self?.showStorageStatus() }
         )
         popover.contentViewController = NSHostingController(rootView: content)
     }
@@ -396,6 +409,21 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
         present(networkWindow)
     }
 
+    private func showStorageStatus() {
+        popover.performClose(nil)
+        if storageWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: StorageStatusWindow(monitor: storage)))
+            window.title = "Storage Status"
+            window.setContentSize(NSSize(width: 860, height: 600))
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            storageWindow = window
+        }
+        present(storageWindow)
+    }
+
     private func present(_ window: NSWindow?) {
         guard let window else { return }
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -408,6 +436,9 @@ private final class StatusBarController: NSObject, NSPopoverDelegate, NSWindowDe
             settingsWindow = nil
         } else if window === managerWindow {
             managerWindow = nil
+        } else if window === storageWindow {
+            storage.stop()
+            storageWindow = nil
         } else if window === networkWindow {
             network?.stop()
             network = nil

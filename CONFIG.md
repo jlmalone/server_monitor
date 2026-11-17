@@ -337,3 +337,47 @@ intentionally kept out of the public repository. They are synced across your own
 machines **out-of-band** (e.g. via your file-transfer tooling), **not** through
 git. Treat them like `.env`: local, private, and never staged. The repo's
 `.gitignore` already excludes `*.local.*` and `config/worker.json` as a backstop.
+
+## Storage Status and Sietch search
+
+The menu shows filesystem-available bytes for the current home drive, refreshed
+when opened and once per minute. **Storage Status** opens a machine → mounted
+filesystem hierarchy. Local `df -Pk` and Tailscale peer discovery run only on
+window open or explicit Refresh. Up to 32 peers per refresh may receive one
+non-interactive, known-host-only SSH `df -Pk` query, sequentially, with a
+10-second deadline each. Unsupported, inaccessible and offline peers remain
+visible without invented capacity. APFS volumes can share capacity; do not sum
+rows as independent physical disks. Unmounted drives cannot be measured.
+
+Optional private configuration: `~/.config/server-monitor/storage.json`, based on
+[`config/storage.example.json`](config/storage.example.json). `hosts` maps peer
+addresses to existing SSH aliases for account/key routing. No credentials or
+private topology belong in tracked configuration.
+
+**Search Sietch** queries an existing source selected in the Catalog picker:
+
+- `sqliteCatalog`: CHOAM's existing Sietch catalog index (`files`, `files_fts`,
+  `catalog_sources`). Name/path uses an FTS phrase. CID and Hash use exact matches.
+  Search spans every machine/drive already in this index.
+- `sqliteRegistry`: Sietch `content_locations`. CID uses exact match; other modes
+  search the path literally (the registry has no hash column).
+- `flatFile`: local UTF-8 catalog, streamed as raw TSV lines with a byte cursor.
+  Search matches literal text anywhere in a line, regardless of the Match picker.
+  Remote flat files should use their existing server-side SQLite index instead.
+
+SQLite runs read-only on its owning machine, optionally via `ssh`, with the
+configured `sqlite` binary (default `/usr/bin/sqlite3`). A modern SQLite with FTS5,
+JSON output and `.progress` is required; Homebrew SQLite can be configured on Macs
+whose system SQLite cannot open the FTS database. No catalog is rebuilt, imported,
+transferred, indexed, fetched through IPFS, or modified by this UI.
+
+Queries run only on Search/Return/Next, never per keystroke. Each page replaces
+its predecessor: at most 50 displayed rows, one lookahead row, keyset pagination,
+1 MiB captured output, a 2 MiB SQLite cache and a 10-million-opcode query budget.
+There is one active query per window and a 15-second local process deadline.
+Flat-file pages have 64 KiB chunks, a 1 MiB maximum line, and a 32 MiB / three-second
+scan budget. Next continues after budget exhaustion even when a page has no hits.
+Catalogs should remain unchanged while paging; restart a search after an index
+refresh. Result dates are historical observations, never current file-presence
+proof. Only indexed sources are searchable; this view makes no completeness claim
+about files that have never been cataloged.

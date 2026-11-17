@@ -1,0 +1,24 @@
+{
+  "hosts": [
+    {"address": "192.0.2.10", "ssh": "storage-server"}
+  ],
+  "catalogs": [
+    {
+      "name": "All indexed machines and drives",
+      "kind": "sqliteCatalog",
+      "ssh": "storage-server",
+      "sqlite": "/opt/homebrew/opt/sqlite/bin/sqlite3",
+      "path": "/absolute/path/to/catalog-index.db"
+    },
+    {
+      "name": "Sietch content locations",
+      "kind": "sqliteRegistry",
+      "path": "/absolute/path/to/registry.db"
+    },
+    {
+      "name": "Local flat catalog",
+      "kind": "flatFile",
+      "path": "/absolute/path/to/catalog.txt"
+    }
+  ]
+}
